@@ -11,10 +11,45 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
+API_KEY1 = os.getenv("API_KEY1")  # Add second API key
 
-if not API_KEY:
-    st.error("❌ API key not found! Check your .env file.")
-    st.stop()  # Stops execution if no API key is found.
+if not API_KEY and not API_KEY1:
+    st.error("❌ No API keys found! Check your .env file.")
+    st.stop()
+
+# Initialize current API key in session state
+if 'current_api_key' not in st.session_state:
+    st.session_state.current_api_key = API_KEY
+
+def switch_api_key():
+    """Switch between available API keys"""
+    if st.session_state.current_api_key == API_KEY and API_KEY1:
+        st.session_state.current_api_key = API_KEY1
+        return True
+    elif st.session_state.current_api_key == API_KEY1 and API_KEY:
+        st.session_state.current_api_key = API_KEY
+        return True
+    return False
+
+def handle_api_response(response_json, retry_func=None, *args, **kwargs):
+    """Handle API response and switch keys if needed"""
+    if 'error' in response_json:
+        error = response_json.get('error', {})
+        if isinstance(error, dict):
+            error_code = error.get('code')
+            error_message = error.get('message', '')
+            
+            # Check for quota error
+            if error_code == 429 and 'quota' in error_message.lower():
+                if switch_api_key():
+                    st.warning("Switching to alternate API key due to quota limit...")
+                    if retry_func:
+                        return retry_func(*args, **kwargs)
+                    return None
+                else:
+                    st.error("❌ All API keys have reached their quota limits!")
+                    return None
+    return response_json
 
 # OpenRouter API URL for Qwen2.5-VL-72B-Instruct
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -78,7 +113,7 @@ def analyze_cylinder_image(image_bytes):
     }
 
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
         "Content-Type": "application/json"
     }
 
@@ -89,6 +124,10 @@ def analyze_cylinder_image(image_bytes):
         if response.status_code == 200 and "choices" in response_json:
             return response_json["choices"][0]["message"]["content"]
         else:
+            # Handle API error and retry if needed
+            handled_response = handle_api_response(response_json, analyze_cylinder_image, image_bytes)
+            if handled_response:
+                return handled_response["choices"][0]["message"]["content"]
             return f"❌ API Error: {response_json}"
 
     except Exception as e:
@@ -128,7 +167,7 @@ def analyze_valve_image(image_bytes):
     }
 
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
         "Content-Type": "application/json"
     }
 
@@ -139,6 +178,10 @@ def analyze_valve_image(image_bytes):
         if response.status_code == 200 and "choices" in response_json:
             return response_json["choices"][0]["message"]["content"]
         else:
+            # Handle API error and retry if needed
+            handled_response = handle_api_response(response_json, analyze_valve_image, image_bytes)
+            if handled_response:
+                return handled_response["choices"][0]["message"]["content"]
             return f"❌ API Error: {response_json}"
 
     except Exception as e:
@@ -180,7 +223,7 @@ def analyze_gearbox_image(image_bytes):
     }
 
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
         "Content-Type": "application/json"
     }
 
@@ -191,6 +234,10 @@ def analyze_gearbox_image(image_bytes):
         if response.status_code == 200 and "choices" in response_json:
             return response_json["choices"][0]["message"]["content"]
         else:
+            # Handle API error and retry if needed
+            handled_response = handle_api_response(response_json, analyze_gearbox_image, image_bytes)
+            if handled_response:
+                return handled_response["choices"][0]["message"]["content"]
             return f"❌ API Error: {response_json}"
 
     except Exception as e:
@@ -229,7 +276,7 @@ def identify_drawing_type(image_bytes):
     }
 
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
         "Content-Type": "application/json"
     }
 
@@ -249,6 +296,16 @@ def identify_drawing_type(image_bytes):
             else:
                 return f"❌ Invalid drawing type: {drawing_type}"
         else:
+            # Handle API error and retry if needed
+            handled_response = handle_api_response(response_json, identify_drawing_type, image_bytes)
+            if handled_response:
+                drawing_type = handled_response["choices"][0]["message"]["content"].strip().upper()
+                if "CYLINDER" in drawing_type:
+                    return "CYLINDER"
+                elif "VALVE" in drawing_type:
+                    return "VALVE"
+                elif "GEARBOX" in drawing_type:
+                    return "GEARBOX"
             return f"❌ API Error: {response_json}"
 
     except Exception as e:
