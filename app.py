@@ -440,28 +440,79 @@ def main():
     if not st.session_state.drawings_table.empty:
         st.write("### Processed Drawings")
         
-        # Create styled table
-        styled_df = st.session_state.drawings_table.style.apply(lambda x: [
-            'background-color: #f8f9fa' if i % 2 == 0 else ''
-            for i in range(len(x))
-        ])
+        # Add a View column to the dataframe
+        df_with_view = st.session_state.drawings_table.copy()
         
-        # Add view buttons
-        st.dataframe(
-            styled_df,
-            use_container_width=True,
-            column_config={
-                "Action": st.column_config.ButtonColumn(
-                    "Action",
-                    help="Click to view details",
-                    default="View"
-                )
-            }
-        )
+        # Display each row with a view button
+        for index, row in df_with_view.iterrows():
+            col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 1])
+            
+            with col1:
+                st.write(row['Drawing Type'])
+            with col2:
+                st.write(row['Drawing No.'])
+            with col3:
+                status_color = {
+                    'Processing..': 'blue',
+                    'Completed': 'green',
+                    'Needs Review!': 'orange',
+                    'Failed': 'red'
+                }.get(row['Processing Status'], 'black')
+                st.markdown(f"<span style='color: {status_color}'>{row['Processing Status']}</span>", unsafe_allow_html=True)
+            with col4:
+                st.write(row['Extracted Fields Count'])
+            with col5:
+                st.write(row['Confidence Score'])
+            with col6:
+                if st.button('View', key=f'view_{index}'):
+                    st.session_state.selected_drawing = row['Drawing No.']
+                    st.experimental_rerun()
 
     # Show detailed view
     if st.session_state.selected_drawing and st.session_state.selected_drawing in st.session_state.all_results:
-        show_detailed_view()
+        st.write(f"### Detailed View: {st.session_state.selected_drawing}")
+        
+        results = st.session_state.all_results[st.session_state.selected_drawing]
+        drawing_type = st.session_state.drawings_table[
+            st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
+        ]['Drawing Type'].iloc[0]
+        
+        # Create detailed parameters table
+        parameters = get_parameters_for_type(drawing_type)
+        detailed_data = []
+        
+        for param in parameters:
+            value = results.get(param, '')
+            confidence = "100%" if value.strip() else "0%"
+            action = "✅ Auto-filled" if value.strip() else "🔴 Manual Detection Required"
+            
+            detailed_data.append({
+                "Parameter": param,
+                "Value": value if value.strip() else "Not detected",
+                "Confidence": confidence,
+                "Action": action
+            })
+        
+        # Display detailed data
+        detailed_df = pd.DataFrame(detailed_data)
+        st.table(detailed_df)
+        
+        # Add export and back buttons
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("Back to All Drawings"):
+                st.session_state.selected_drawing = None
+                st.experimental_rerun()
+        
+        with col2:
+            if st.button("Export to CSV"):
+                csv = detailed_df.to_csv(index=False)
+                st.download_button(
+                    label="Download Detailed Report",
+                    data=csv,
+                    file_name=f"{st.session_state.selected_drawing}_details.csv",
+                    mime="text/csv"
+                )
 
 if __name__ == "__main__":
     main()
