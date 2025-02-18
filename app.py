@@ -173,15 +173,25 @@ def analyze_valve_image(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Analyze the valve engineering drawing and extract only the values that are clearly visible in the image.\n"
+                            "Analyze this valve engineering drawing carefully. This appears to be a pressure relief valve type key diagram.\n"
                             "STRICT RULES:\n"
-                            "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
-                            "2) Extract and return data in this format:\n"
-                            "MODEL: [value]\n"
-                            "CORRECT MODEL NO: [value]\n"
-                            "PRESSURE RATING: [value] BAR\n"
-                            "MAKE: [value]\n"
-                            "DRAWING NUMBER: [Extract from Image]"
+                            "1) Look for the type key information and ordering example at the top of the drawing.\n"
+                            "2) Extract the model series (e.g. SPV, SPVF) from the title.\n"
+                            "3) Look for pressure ratings in bar units.\n"
+                            "4) Find the manufacturer name (e.g. KRACHT).\n"
+                            "5) Extract the complete model number from the ordering example.\n"
+                            "6) Return data in this EXACT format:\n"
+                            "MODEL: [Valve series name e.g. SPV/SPVF]\n"
+                            "CORRECT MODEL NO: [Complete model number from ordering example]\n"
+                            "PRESSURE RATING: [Pressure range in bar]\n"
+                            "MAKE: [Manufacturer name]\n"
+                            "DRAWING NUMBER: [Any visible drawing number]\n\n"
+                            "Example output:\n"
+                            "MODEL: SPVF\n"
+                            "CORRECT MODEL NO: SPVF 80 A 1G 1 A12\n"
+                            "PRESSURE RATING: 4...12 BAR\n"
+                            "MAKE: KRACHT\n"
+                            "DRAWING NUMBER: [number if visible]"
                         )
                     },
                     {
