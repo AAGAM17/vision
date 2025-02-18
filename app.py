@@ -451,79 +451,83 @@ def main():
             
             with col1:
                 if st.button("Process Drawing", key="process_button"):
-                    # Reset processing status
-                    st.session_state.processing_status = None
-                    
-                    with st.spinner('Identifying drawing type...'):
-                        uploaded_file.seek(0)
-                        image_bytes = uploaded_file.read()
+                    try:
+                        # Reset processing status
+                        st.session_state.processing_status = None
                         
-                        try:
-                            # First identify the drawing type
+                        # Step 1: Identify drawing type
+                        with st.spinner('Identifying drawing type...'):
+                            uploaded_file.seek(0)
+                            image_bytes = uploaded_file.read()
                             drawing_type = identify_drawing_type(image_bytes)
                             
-                            if drawing_type and not "❌" in drawing_type:
-                                # Show initial processing status
-                                status_placeholder = st.empty()
-                                status_placeholder.info(f"✅ Identified as: {drawing_type}")
-                                
-                                new_drawing = {
-                                    'Drawing Type': drawing_type,
-                                    'Drawing No.': 'Processing..',
-                                    'Processing Status': 'Processing..',
-                                    'Extracted Fields Count': '',
-                                    'Confidence Score': ''
-                                }
-                                
-                                # Add to table immediately to show processing status
-                                st.session_state.drawings_table = pd.concat([
-                                    st.session_state.drawings_table,
-                                    pd.DataFrame([new_drawing])
-                                ], ignore_index=True)
-                                
-                                with st.spinner(f'Processing {drawing_type.lower()} drawing...'):
-                                    result = None
-                                    if drawing_type == "CYLINDER":
-                                        result = analyze_cylinder_image(image_bytes)
-                                    elif drawing_type == "VALVE":
-                                        result = analyze_valve_image(image_bytes)
-                                    elif drawing_type == "GEARBOX":
-                                        result = analyze_gearbox_image(image_bytes)
-                                    
-                                    if result and not "❌" in result:
-                                        parsed_results = parse_ai_response(result)
-                                        drawing_number = parsed_results.get('DRAWING NUMBER', '')
-                                        if drawing_number:
-                                            st.session_state.all_results[drawing_number] = parsed_results
-                                            
-                                            parameters = get_parameters_for_type(drawing_type)
-                                            non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
-                                            total_fields = len(parameters)
-                                            confidence_score = f"{(non_empty_fields / total_fields * 100):.0f}%"
-                                            
-                                            new_drawing.update({
-                                                'Drawing No.': drawing_number,
-                                                'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
-                                                'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
-                                                'Confidence Score': confidence_score
-                                            })
-                                            
-                                            # Update the status placeholder
-                                            status_placeholder.success("✅ Drawing processed successfully!")
-                                        else:
-                                            st.error("❌ Could not extract drawing number")
-                                            new_drawing['Processing Status'] = 'Failed'
-                                    else:
-                                        st.error(result if result else "❌ Processing failed")
-                                        new_drawing['Processing Status'] = 'Failed'
-                                
-                                # Update the entry in the table
-                                st.session_state.drawings_table.iloc[-1] = new_drawing
-                                st.experimental_rerun()
-                            else:
+                            if not drawing_type or "❌" in drawing_type:
                                 st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
-                        except Exception as e:
-                            st.error(f"❌ An error occurred: {str(e)}")
+                                return
+                            
+                            # Show initial processing status
+                            status_placeholder = st.empty()
+                            status_placeholder.info(f"✅ Identified as: {drawing_type}")
+                            
+                            # Initialize new drawing entry
+                            new_drawing = {
+                                'Drawing Type': drawing_type,
+                                'Drawing No.': 'Processing..',
+                                'Processing Status': 'Processing..',
+                                'Extracted Fields Count': '',
+                                'Confidence Score': ''
+                            }
+                            
+                            # Add to table immediately to show processing status
+                            st.session_state.drawings_table = pd.concat([
+                                st.session_state.drawings_table,
+                                pd.DataFrame([new_drawing])
+                            ], ignore_index=True)
+                        
+                        # Step 2: Process drawing
+                        with st.spinner(f'Processing {drawing_type.lower()} drawing...'):
+                            # Choose appropriate analysis function
+                            result = None
+                            if drawing_type == "CYLINDER":
+                                result = analyze_cylinder_image(image_bytes)
+                            elif drawing_type == "VALVE":
+                                result = analyze_valve_image(image_bytes)
+                            elif drawing_type == "GEARBOX":
+                                result = analyze_gearbox_image(image_bytes)
+                            
+                            if not result or "❌" in result:
+                                st.error(result if result else "❌ Processing failed")
+                                new_drawing['Processing Status'] = 'Failed'
+                            else:
+                                parsed_results = parse_ai_response(result)
+                                drawing_number = parsed_results.get('DRAWING NUMBER', '')
+                                
+                                if not drawing_number:
+                                    st.error("❌ Could not extract drawing number")
+                                    new_drawing['Processing Status'] = 'Failed'
+                                else:
+                                    # Store results and update status
+                                    st.session_state.all_results[drawing_number] = parsed_results
+                                    parameters = get_parameters_for_type(drawing_type)
+                                    non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
+                                    total_fields = len(parameters)
+                                    confidence_score = f"{(non_empty_fields / total_fields * 100):.0f}%"
+                                    
+                                    new_drawing.update({
+                                        'Drawing No.': drawing_number,
+                                        'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
+                                        'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
+                                        'Confidence Score': confidence_score
+                                    })
+                                    
+                                    status_placeholder.success("✅ Drawing processed successfully!")
+                        
+                        # Update the entry in the table
+                        st.session_state.drawings_table.iloc[-1] = new_drawing
+                        st.experimental_rerun()
+                        
+                    except Exception as e:
+                        st.error(f"❌ An error occurred: {str(e)}")
 
             with col2:
                 image = Image.open(uploaded_file)
