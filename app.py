@@ -551,7 +551,7 @@ def main():
             })
         
         # Add save, export and back buttons
-        col1, col2, col3 = st.columns([1, 2, 2])
+        col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
         with col1:
             if st.button("Back to All Drawings"):
                 st.session_state.selected_drawing = None
@@ -589,6 +589,26 @@ def main():
                 file_name=f"{st.session_state.selected_drawing}_details.csv",
                 mime="text/csv"
             )
+        
+        with col4:
+            # Create a clean format of just the values
+            values_text = "\n".join([
+                f"{row['Value']}"
+                for row in edited_data
+                if row['Value'] and row['Value'] != "Not detected"
+            ])
+            
+            if st.button("Copy Values"):
+                st.code(values_text, language="text")
+                st.toast("✅ Values are ready to copy! Click the copy button in the code block.")
+                
+                # Also provide a download option for the values
+                st.download_button(
+                    label="Download Values as TXT",
+                    data=values_text,
+                    file_name=f"{st.session_state.selected_drawing}_values.txt",
+                    mime="text/plain"
+                )
 
 if __name__ == "__main__":
     main()
