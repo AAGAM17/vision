@@ -49,7 +49,44 @@ def handle_api_response(response_json, retry_func=None, *args, **kwargs):
                 else:
                     st.error("❌ All API keys have reached their quota limits!")
                     return None
+            # Handle other specific error codes
+            elif error_code == 400:
+                st.error("❌ Bad request: Please check the image format")
+                return None
+            elif error_code == 401:
+                st.error("❌ Authentication failed: Please check your API key")
+                return None
+            elif error_code == 403:
+                st.error("❌ Access forbidden: Please check your API permissions")
+                return None
+            elif error_code == 500:
+                st.error("❌ Server error: Please try again later")
+                return None
+            else:
+                st.error(f"❌ API Error: {error_message}")
+                return None
     return response_json
+
+def process_api_response(response, retry_func=None, *args, **kwargs):
+    """Process API response and handle errors"""
+    try:
+        response_json = response.json()
+        
+        # Check if response is successful and contains choices
+        if response.status_code == 200 and "choices" in response_json:
+            return response_json["choices"][0]["message"]["content"]
+            
+        # Handle API errors
+        handled_response = handle_api_response(response_json, retry_func, *args, **kwargs)
+        if handled_response and "choices" in handled_response:
+            return handled_response["choices"][0]["message"]["content"]
+            
+        # If we get here, something went wrong
+        error_msg = response_json.get('error', {}).get('message', 'Unknown error occurred')
+        return f"❌ API Error: {error_msg}"
+        
+    except Exception as e:
+        return f"❌ Processing Error: {str(e)}"
 
 # OpenRouter API URL for Qwen2.5-VL-72B-Instruct
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -119,17 +156,7 @@ def analyze_cylinder_image(image_bytes):
 
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
-        response_json = response.json()
-        
-        if response.status_code == 200 and "choices" in response_json:
-            return response_json["choices"][0]["message"]["content"]
-        else:
-            # Handle API error and retry if needed
-            handled_response = handle_api_response(response_json, analyze_cylinder_image, image_bytes)
-            if handled_response:
-                return handled_response["choices"][0]["message"]["content"]
-            return f"❌ API Error: {response_json}"
-
+        return process_api_response(response, analyze_cylinder_image, image_bytes)
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
@@ -173,17 +200,7 @@ def analyze_valve_image(image_bytes):
 
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
-        response_json = response.json()
-        
-        if response.status_code == 200 and "choices" in response_json:
-            return response_json["choices"][0]["message"]["content"]
-        else:
-            # Handle API error and retry if needed
-            handled_response = handle_api_response(response_json, analyze_valve_image, image_bytes)
-            if handled_response:
-                return handled_response["choices"][0]["message"]["content"]
-            return f"❌ API Error: {response_json}"
-
+        return process_api_response(response, analyze_valve_image, image_bytes)
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
@@ -229,17 +246,7 @@ def analyze_gearbox_image(image_bytes):
 
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
-        response_json = response.json()
-        
-        if response.status_code == 200 and "choices" in response_json:
-            return response_json["choices"][0]["message"]["content"]
-        else:
-            # Handle API error and retry if needed
-            handled_response = handle_api_response(response_json, analyze_gearbox_image, image_bytes)
-            if handled_response:
-                return handled_response["choices"][0]["message"]["content"]
-            return f"❌ API Error: {response_json}"
-
+        return process_api_response(response, analyze_gearbox_image, image_bytes)
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
@@ -282,11 +289,10 @@ def identify_drawing_type(image_bytes):
 
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
-        response_json = response.json()
+        result = process_api_response(response, identify_drawing_type, image_bytes)
         
-        if response.status_code == 200 and "choices" in response_json:
-            drawing_type = response_json["choices"][0]["message"]["content"].strip().upper()
-            # Clean up the response to handle potential duplicates
+        if "❌" not in result:
+            drawing_type = result.strip().upper()
             if "CYLINDER" in drawing_type:
                 return "CYLINDER"
             elif "VALVE" in drawing_type:
@@ -295,19 +301,7 @@ def identify_drawing_type(image_bytes):
                 return "GEARBOX"
             else:
                 return f"❌ Invalid drawing type: {drawing_type}"
-        else:
-            # Handle API error and retry if needed
-            handled_response = handle_api_response(response_json, identify_drawing_type, image_bytes)
-            if handled_response:
-                drawing_type = handled_response["choices"][0]["message"]["content"].strip().upper()
-                if "CYLINDER" in drawing_type:
-                    return "CYLINDER"
-                elif "VALVE" in drawing_type:
-                    return "VALVE"
-                elif "GEARBOX" in drawing_type:
-                    return "GEARBOX"
-            return f"❌ API Error: {response_json}"
-
+        return result
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
