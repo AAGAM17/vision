@@ -303,24 +303,53 @@ def main():
         st.session_state.all_results = {}
     if 'selected_drawing' not in st.session_state:
         st.session_state.selected_drawing = None
+    if 'processing_status' not in st.session_state:
+        st.session_state.processing_status = None
 
     # Display the drawings table at the top with view buttons
     if not st.session_state.drawings_table.empty:
         st.write("### Processed Drawings")
         
-        # Create a DataFrame copy with a "View" button column
-        display_df = st.session_state.drawings_table.copy()
+        # Create the table with alternating row colors and proper styling
+        table_html = "<div style='width:100%; background-color:#f0f2f6; padding:10px; border-radius:5px;'>"
+        table_html += "<table style='width:100%; border-collapse:collapse;'>"
+        table_html += "<tr style='background-color:#e1e4e8;'>"
+        table_html += "<th style='padding:10px; text-align:left;'>Drawing Type</th>"
+        table_html += "<th style='padding:10px; text-align:left;'>Drawing No.</th>"
+        table_html += "<th style='padding:10px; text-align:left;'>Processing Status</th>"
+        table_html += "<th style='padding:10px; text-align:left;'>Extracted Fields Count</th>"
+        table_html += "<th style='padding:10px; text-align:left;'>Confidence Score</th>"
+        table_html += "<th style='padding:10px; text-align:center;'>Action</th>"
+        table_html += "</tr>"
         
-        # Display table with view buttons
-        for index, row in display_df.iterrows():
-            cols = st.columns([2, 2, 2, 2, 2, 1])
-            cols[0].write(row['Drawing Type'])
-            cols[1].write(row['Drawing No.'])
-            cols[2].write(row['Processing Status'])
-            cols[3].write(row['Extracted Fields Count'])
-            cols[4].write(row['Confidence Score'])
-            if cols[5].button('View', key=f'view_{index}'):
+        for index, row in st.session_state.drawings_table.iterrows():
+            bg_color = "#ffffff" if index % 2 == 0 else "#f8f9fa"
+            table_html += f"<tr style='background-color:{bg_color};'>"
+            table_html += f"<td style='padding:10px;'>{row['Drawing Type']}</td>"
+            table_html += f"<td style='padding:10px;'>{row['Drawing No.']}</td>"
+            
+            # Style the status
+            status_color = {
+                'Processing..': 'blue',
+                'Completed': 'green',
+                'Needs Review!': 'orange',
+                'Failed': 'red'
+            }.get(row['Processing Status'], 'black')
+            
+            table_html += f"<td style='padding:10px; color:{status_color};'>{row['Processing Status']}</td>"
+            table_html += f"<td style='padding:10px;'>{row['Extracted Fields Count']}</td>"
+            table_html += f"<td style='padding:10px;'>{row['Confidence Score']}</td>"
+            table_html += "<td style='padding:10px; text-align:center;'>"
+            
+            # Add view button column
+            cols = st.columns([5, 1])
+            if cols[1].button('View', key=f'view_{index}'):
                 st.session_state.selected_drawing = row['Drawing No.']
+            
+            table_html += "</td></tr>"
+        
+        table_html += "</table></div>"
+        st.markdown(table_html, unsafe_allow_html=True)
 
     # Show detailed view if a drawing is selected
     if st.session_state.selected_drawing and st.session_state.selected_drawing in st.session_state.all_results:
@@ -337,33 +366,81 @@ def main():
         
         for param in parameters:
             value = results.get(param, '')
-            confidence = "100%" if value.strip() else "0%"
+            
+            # Determine action and confidence based on value and parameter type
             if value.strip():
-                action = "✅ Auto-filled"
-                confidence = "100%"
-            elif param in ["CLOSE LENGTH", "OPEN LENGTH"]:
-                action = "🔴 Manual Input Required"
-                confidence = ""
+                # Check if the value might be unclear (e.g., very short or unexpected format)
+                if len(value) < 2 or (param == 'DRAWING NUMBER' and not any(c.isdigit() for c in value)):
+                    action = "⚠️ Review Required"
+                    confidence = "95%"
+                else:
+                    action = "✅ Auto-filled"
+                    confidence = "100%"
             else:
-                action = "⚠️ Review Required"
-                confidence = "95%"
+                # Specific handling for different parameters
+                if param in ["CLOSE LENGTH", "OPEN LENGTH"]:
+                    action = "🔴 Manual Input Required"
+                    confidence = ""
+                    value = "Input box.."
+                elif "DIAMETER" in param or "PRESSURE" in param or "TEMPERATURE" in param:
+                    action = "🔴 Manual Detection Required (Blur/Unclear)"
+                    confidence = "0%"
+                    value = "Input box.."
+                else:
+                    action = "⚠️ Review Required"
+                    confidence = "95%"
+                    value = "Input box.."
             
             detailed_data.append({
                 "Field Name": param,
-                "Value": value if value.strip() else "Input box..",
+                "Value": value,
                 "Action": action,
                 "Confidence Score": confidence
             })
         
+        # Create a styled detailed view
+        st.markdown("""
+            <style>
+            .detailed-table th {
+                background-color: #e1e4e8;
+                padding: 12px;
+            }
+            .detailed-table td {
+                padding: 10px;
+            }
+            .auto-filled {
+                color: green;
+            }
+            .review-required {
+                color: orange;
+            }
+            .manual-required {
+                color: red;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
         detailed_df = pd.DataFrame(detailed_data)
+        st.table(detailed_df.style.apply(lambda x: [
+            'background-color: #f8f9fa' if i % 2 == 0 else '' 
+            for i in range(len(x))
+        ]))
         
-        # Display the detailed table
-        st.table(detailed_df)
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("Back to All Drawings"):
+                st.session_state.selected_drawing = None
+                st.experimental_rerun()
         
-        # Add a button to clear selection
-        if st.button("Back to All Drawings"):
-            st.session_state.selected_drawing = None
-            st.experimental_rerun()
+        with col2:
+            if st.button("Export to CSV"):
+                csv = detailed_df.to_csv(index=False)
+                st.download_button(
+                    label="Download Detailed Report",
+                    data=csv,
+                    file_name=f"{st.session_state.selected_drawing}_details.csv",
+                    mime="text/csv"
+                )
 
     # File uploader and processing section
     if st.session_state.selected_drawing is None:
@@ -374,27 +451,38 @@ def main():
             
             with col1:
                 if st.button("Process Drawing", key="process_button"):
+                    # Reset processing status
+                    st.session_state.processing_status = None
+                    
                     with st.spinner('Identifying drawing type...'):
                         uploaded_file.seek(0)
                         image_bytes = uploaded_file.read()
                         
+                        # First identify the drawing type
                         drawing_type = identify_drawing_type(image_bytes)
                         
                         if "❌" in drawing_type:
                             st.error(drawing_type)
                         else:
-                            st.info(f"✅ Identified drawing type: {drawing_type}")
+                            # Show initial processing status
+                            status_placeholder = st.empty()
+                            status_placeholder.info(f"✅ Identified as: {drawing_type}")
                             
                             new_drawing = {
                                 'Drawing Type': drawing_type,
-                                'Drawing No.': '',
+                                'Drawing No.': 'Processing..',
                                 'Processing Status': 'Processing..',
                                 'Extracted Fields Count': '',
                                 'Confidence Score': ''
                             }
                             
+                            # Add to table immediately to show processing status
+                            st.session_state.drawings_table = pd.concat([
+                                st.session_state.drawings_table,
+                                pd.DataFrame([new_drawing])
+                            ], ignore_index=True)
+                            
                             with st.spinner(f'Processing {drawing_type.lower()} drawing...'):
-                                # Choose the appropriate analysis function based on drawing type
                                 if drawing_type == "CYLINDER":
                                     result = analyze_cylinder_image(image_bytes)
                                 elif drawing_type == "VALVE":
@@ -422,13 +510,12 @@ def main():
                                         'Confidence Score': confidence_score
                                     })
                                     
-                                    st.success("✅ Drawing processed successfully!")
+                                    # Update the status placeholder
+                                    status_placeholder.success("✅ Drawing processed successfully!")
                             
-                            # Add new drawing to the table
-                            st.session_state.drawings_table = pd.concat([
-                                st.session_state.drawings_table,
-                                pd.DataFrame([new_drawing])
-                            ], ignore_index=True)
+                            # Update the entry in the table
+                            st.session_state.drawings_table.iloc[-1] = new_drawing
+                            st.experimental_rerun()
 
             with col2:
                 image = Image.open(uploaded_file)
