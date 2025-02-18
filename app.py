@@ -46,25 +46,26 @@ def analyze_cylinder_image(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Analyze the engineering drawing and extract only the values that are clearly visible in the image.\n"
+                            "Analyze this hydraulic/pneumatic cylinder engineering drawing carefully.\n"
                             "STRICT RULES:\n"
-                            "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
-                            "2) Convert values to the specified units where applicable.\n"
-                            "3) Determine whether the cylinder is SINGLE-ACTION or DOUBLE-ACTION and set it under CYLINDER ACTION.\n"
-                            "4) Extract and return data in this format:\n"
-                            "CYLINDER ACTION: [value]\n"
+                            "1) Extract ONLY values that are clearly visible. Return empty string if unclear.\n"
+                            "2) Convert all measurements to specified units.\n"
+                            "3) For CYLINDER ACTION, determine if SINGLE or DOUBLE action based on design.\n"
+                            "4) Look for text labels and dimensions in the drawing.\n"
+                            "5) Return data in this EXACT format:\n"
+                            "CYLINDER ACTION: [SINGLE/DOUBLE]\n"
                             "BORE DIAMETER: [value] MM\n"
-                            "OUTSIDE DIAMETER: \n"
+                            "OUTSIDE DIAMETER: [value] MM\n"
                             "ROD DIAMETER: [value] MM\n"
                             "STROKE LENGTH: [value] MM\n"
                             "CLOSE LENGTH: [value] MM\n"
-                            "OPEN LENGTH: \n"
+                            "OPEN LENGTH: [value] MM\n"
                             "OPERATING PRESSURE: [value] BAR\n"
                             "OPERATING TEMPERATURE: [value] DEG C\n"
-                            "MOUNTING: \n"
-                            "ROD END: \n"
-                            "FLUID: [Determine and Extract] \n"
-                            "DRAWING NUMBER: [Extract from Image]"
+                            "MOUNTING: [value]\n"
+                            "ROD END: [value]\n"
+                            "FLUID: [value]\n"
+                            "DRAWING NUMBER: [value]"
                         )
                     },
                     {
@@ -88,7 +89,7 @@ def analyze_cylinder_image(image_bytes):
         if response.status_code == 200 and "choices" in response_json:
             return response_json["choices"][0]["message"]["content"]
         else:
-            return f"❌ API Error: {response_json}"  # Returns error details
+            return f"❌ API Error: {response_json}"
 
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
@@ -295,8 +296,37 @@ def main():
     # Set page config
     st.set_page_config(
         page_title="JSW Engineering Drawing DataSheet Extractor",
-        layout="wide"
+        layout="wide",
+        initial_sidebar_state="collapsed"
     )
+
+    # Custom CSS for better UI
+    st.markdown("""
+        <style>
+        .main {
+            padding: 0rem 1rem;
+        }
+        .stButton>button {
+            width: 100%;
+            border-radius: 5px;
+            height: 3em;
+            background-color: #0066cc;
+            color: white;
+        }
+        .stSpinner>div {
+            text-align: center;
+            color: #0066cc;
+        }
+        .error-text {
+            color: #ff0000;
+            font-weight: bold;
+        }
+        .success-text {
+            color: #00aa00;
+            font-weight: bold;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
     # Title
     st.title("JSW Engineering Drawing DataSheet Extractor")
@@ -314,144 +344,6 @@ def main():
         st.session_state.all_results = {}
     if 'selected_drawing' not in st.session_state:
         st.session_state.selected_drawing = None
-    if 'processing_status' not in st.session_state:
-        st.session_state.processing_status = None
-
-    # Display the drawings table at the top with view buttons
-    if not st.session_state.drawings_table.empty:
-        st.write("### Processed Drawings")
-        
-        # Create the table with alternating row colors and proper styling
-        table_html = "<div style='width:100%; background-color:#f0f2f6; padding:10px; border-radius:5px;'>"
-        table_html += "<table style='width:100%; border-collapse:collapse;'>"
-        table_html += "<tr style='background-color:#e1e4e8;'>"
-        table_html += "<th style='padding:10px; text-align:left;'>Drawing Type</th>"
-        table_html += "<th style='padding:10px; text-align:left;'>Drawing No.</th>"
-        table_html += "<th style='padding:10px; text-align:left;'>Processing Status</th>"
-        table_html += "<th style='padding:10px; text-align:left;'>Extracted Fields Count</th>"
-        table_html += "<th style='padding:10px; text-align:left;'>Confidence Score</th>"
-        table_html += "<th style='padding:10px; text-align:center;'>Action</th>"
-        table_html += "</tr>"
-        
-        for index, row in st.session_state.drawings_table.iterrows():
-            bg_color = "#ffffff" if index % 2 == 0 else "#f8f9fa"
-            table_html += f"<tr style='background-color:{bg_color};'>"
-            table_html += f"<td style='padding:10px;'>{row['Drawing Type']}</td>"
-            table_html += f"<td style='padding:10px;'>{row['Drawing No.']}</td>"
-            
-            # Style the status
-            status_color = {
-                'Processing..': 'blue',
-                'Completed': 'green',
-                'Needs Review!': 'orange',
-                'Failed': 'red'
-            }.get(row['Processing Status'], 'black')
-            
-            table_html += f"<td style='padding:10px; color:{status_color};'>{row['Processing Status']}</td>"
-            table_html += f"<td style='padding:10px;'>{row['Extracted Fields Count']}</td>"
-            table_html += f"<td style='padding:10px;'>{row['Confidence Score']}</td>"
-            table_html += "<td style='padding:10px; text-align:center;'>"
-            
-            # Add view button column
-            cols = st.columns([5, 1])
-            if cols[1].button('View', key=f'view_{index}'):
-                st.session_state.selected_drawing = row['Drawing No.']
-            
-            table_html += "</td></tr>"
-        
-        table_html += "</table></div>"
-        st.markdown(table_html, unsafe_allow_html=True)
-
-    # Show detailed view if a drawing is selected
-    if st.session_state.selected_drawing and st.session_state.selected_drawing in st.session_state.all_results:
-        st.write(f"### Detailed View: {st.session_state.selected_drawing}")
-        
-        results = st.session_state.all_results[st.session_state.selected_drawing]
-        drawing_type = st.session_state.drawings_table[
-            st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
-        ]['Drawing Type'].iloc[0]
-        
-        # Create detailed parameters table with confidence scores and actions
-        detailed_data = []
-        parameters = get_parameters_for_type(drawing_type)
-        
-        for param in parameters:
-            value = results.get(param, '')
-            
-            # Determine action and confidence based on value and parameter type
-            if value.strip():
-                # Check if the value might be unclear (e.g., very short or unexpected format)
-                if len(value) < 2 or (param == 'DRAWING NUMBER' and not any(c.isdigit() for c in value)):
-                    action = "⚠️ Review Required"
-                    confidence = "95%"
-                else:
-                    action = "✅ Auto-filled"
-                    confidence = "100%"
-            else:
-                # Specific handling for different parameters
-                if param in ["CLOSE LENGTH", "OPEN LENGTH"]:
-                    action = "🔴 Manual Input Required"
-                    confidence = ""
-                    value = "Input box.."
-                elif "DIAMETER" in param or "PRESSURE" in param or "TEMPERATURE" in param:
-                    action = "🔴 Manual Detection Required (Blur/Unclear)"
-                    confidence = "0%"
-                    value = "Input box.."
-                else:
-                    action = "⚠️ Review Required"
-                    confidence = "95%"
-                    value = "Input box.."
-            
-            detailed_data.append({
-                "Field Name": param,
-                "Value": value,
-                "Action": action,
-                "Confidence Score": confidence
-            })
-        
-        # Create a styled detailed view
-        st.markdown("""
-            <style>
-            .detailed-table th {
-                background-color: #e1e4e8;
-                padding: 12px;
-            }
-            .detailed-table td {
-                padding: 10px;
-            }
-            .auto-filled {
-                color: green;
-            }
-            .review-required {
-                color: orange;
-            }
-            .manual-required {
-                color: red;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-        
-        detailed_df = pd.DataFrame(detailed_data)
-        st.table(detailed_df.style.apply(lambda x: [
-            'background-color: #f8f9fa' if i % 2 == 0 else '' 
-            for i in range(len(x))
-        ]))
-        
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            if st.button("Back to All Drawings"):
-                st.session_state.selected_drawing = None
-                st.experimental_rerun()
-        
-        with col2:
-            if st.button("Export to CSV"):
-                csv = detailed_df.to_csv(index=False)
-                st.download_button(
-                    label="Download Detailed Report",
-                    data=csv,
-                    file_name=f"{st.session_state.selected_drawing}_details.csv",
-                    mime="text/csv"
-                )
 
     # File uploader and processing section
     if st.session_state.selected_drawing is None:
@@ -463,9 +355,6 @@ def main():
             with col1:
                 if st.button("Process Drawing", key="process_button"):
                     try:
-                        # Reset processing status
-                        st.session_state.processing_status = None
-                        
                         # Step 1: Identify drawing type
                         with st.spinner('Identifying drawing type...'):
                             uploaded_file.seek(0)
@@ -474,23 +363,7 @@ def main():
                             
                             if not drawing_type or "❌" in drawing_type:
                                 st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
-                                # Add a failed entry to the table
-                                new_drawing = {
-                                    'Drawing Type': 'Unknown',
-                                    'Drawing No.': 'N/A',
-                                    'Processing Status': 'Failed',
-                                    'Extracted Fields Count': '0/0',
-                                    'Confidence Score': '0%'
-                                }
-                                st.session_state.drawings_table = pd.concat([
-                                    st.session_state.drawings_table,
-                                    pd.DataFrame([new_drawing])
-                                ], ignore_index=True)
                                 return
-                            
-                            # Show initial processing status
-                            status_placeholder = st.empty()
-                            status_placeholder.info(f"✅ Identified as: {drawing_type}")
                             
                             # Initialize new drawing entry
                             new_drawing = {
@@ -501,82 +374,94 @@ def main():
                                 'Confidence Score': ''
                             }
                             
-                            # Add to table immediately to show processing status
+                            # Add to table
                             st.session_state.drawings_table = pd.concat([
                                 st.session_state.drawings_table,
                                 pd.DataFrame([new_drawing])
                             ], ignore_index=True)
-                            st.experimental_rerun()  # Ensure the processing status is shown
-                        
-                        # Step 2: Process drawing
-                        with st.spinner(f'Processing {drawing_type.lower()} drawing...'):
-                            # Choose appropriate analysis function
-                            result = None
-                            if drawing_type == "CYLINDER":
-                                result = analyze_cylinder_image(image_bytes)
-                            elif drawing_type == "VALVE":
-                                result = analyze_valve_image(image_bytes)
-                            elif drawing_type == "GEARBOX":
-                                result = analyze_gearbox_image(image_bytes)
                             
-                            if not result or "❌" in result:
-                                st.error(result if result else "❌ Processing failed")
-                                new_drawing['Processing Status'] = 'Failed'
-                                new_drawing['Confidence Score'] = '0%'
-                                new_drawing['Extracted Fields Count'] = '0/0'
-                            else:
-                                try:
+                            # Show processing status
+                            status_placeholder = st.empty()
+                            status_placeholder.info(f"✅ Identified as: {drawing_type}")
+                            
+                            # Step 2: Process drawing
+                            with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
+                                result = None
+                                if drawing_type == "CYLINDER":
+                                    result = analyze_cylinder_image(image_bytes)
+                                elif drawing_type == "VALVE":
+                                    result = analyze_valve_image(image_bytes)
+                                elif drawing_type == "GEARBOX":
+                                    result = analyze_gearbox_image(image_bytes)
+                                
+                                if not result or "❌" in result:
+                                    st.error(result if result else "❌ Analysis failed")
+                                    new_drawing.update({
+                                        'Processing Status': 'Failed',
+                                        'Confidence Score': '0%',
+                                        'Extracted Fields Count': '0/0'
+                                    })
+                                else:
                                     parsed_results = parse_ai_response(result)
                                     drawing_number = parsed_results.get('DRAWING NUMBER', '')
                                     
                                     if not drawing_number:
                                         st.error("❌ Could not extract drawing number")
-                                        new_drawing['Processing Status'] = 'Failed'
-                                        new_drawing['Drawing No.'] = 'Unknown'
+                                        new_drawing.update({
+                                            'Processing Status': 'Failed',
+                                            'Drawing No.': 'Unknown'
+                                        })
                                     else:
-                                        # Store results and update status
                                         st.session_state.all_results[drawing_number] = parsed_results
                                         parameters = get_parameters_for_type(drawing_type)
                                         non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
                                         total_fields = len(parameters)
-                                        confidence_score = f"{(non_empty_fields / total_fields * 100):.0f}%"
                                         
                                         new_drawing.update({
                                             'Drawing No.': drawing_number,
                                             'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
                                             'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
-                                            'Confidence Score': confidence_score
+                                            'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
                                         })
                                         
                                         status_placeholder.success("✅ Drawing processed successfully!")
-                                except Exception as parse_error:
-                                    st.error(f"❌ Error parsing results: {str(parse_error)}")
-                                    new_drawing['Processing Status'] = 'Failed'
-                                    new_drawing['Confidence Score'] = '0%'
-                                    new_drawing['Extracted Fields Count'] = '0/0'
-                        
-                        # Update the entry in the table
-                        st.session_state.drawings_table.iloc[-1] = new_drawing
-                        st.experimental_rerun()
-                        
+                            
+                            # Update the table
+                            st.session_state.drawings_table.iloc[-1] = new_drawing
+                            st.experimental_rerun()
+                            
                     except Exception as e:
                         st.error(f"❌ An error occurred: {str(e)}")
-                        # Add a failed entry to the table
-                        new_drawing = {
-                            'Drawing Type': 'Error',
-                            'Drawing No.': 'N/A',
-                            'Processing Status': 'Failed',
-                            'Extracted Fields Count': '0/0',
-                            'Confidence Score': '0%'
-                        }
-                        st.session_state.drawings_table = pd.concat([
-                            st.session_state.drawings_table,
-                            pd.DataFrame([new_drawing])
-                        ], ignore_index=True)
-
+            
             with col2:
-                image = Image.open(uploaded_file)
-                st.image(image, caption="Uploaded Technical Drawing")
+                st.image(uploaded_file, caption="Uploaded Technical Drawing", use_column_width=True)
+
+    # Display the drawings table
+    if not st.session_state.drawings_table.empty:
+        st.write("### Processed Drawings")
+        
+        # Create styled table
+        styled_df = st.session_state.drawings_table.style.apply(lambda x: [
+            'background-color: #f8f9fa' if i % 2 == 0 else ''
+            for i in range(len(x))
+        ])
+        
+        # Add view buttons
+        st.dataframe(
+            styled_df,
+            use_container_width=True,
+            column_config={
+                "Action": st.column_config.ButtonColumn(
+                    "Action",
+                    help="Click to view details",
+                    default="View"
+                )
+            }
+        )
+
+    # Show detailed view
+    if st.session_state.selected_drawing and st.session_state.selected_drawing in st.session_state.all_results:
+        show_detailed_view()
 
 if __name__ == "__main__":
     main()
