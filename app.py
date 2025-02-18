@@ -10,6 +10,13 @@ import sys
 import subprocess
 import tempfile
 
+# Set page config - MUST be the first Streamlit command
+st.set_page_config(
+    page_title="JSW Engineering Drawing DataSheet Extractor",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
 # Load API key
 load_dotenv()
 
@@ -366,13 +373,6 @@ def get_parameters_for_type(drawing_type):
     return []
 
 def main():
-    # Set page config
-    st.set_page_config(
-        page_title="JSW Engineering Drawing DataSheet Extractor",
-        layout="wide",
-        initial_sidebar_state="collapsed"
-    )
-
     # Custom CSS for better UI
     st.markdown("""
         <style>
