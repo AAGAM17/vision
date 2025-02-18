@@ -6,7 +6,8 @@ import pandas as pd
 import os
 import requests
 from dotenv import load_dotenv
-from pdf2image import convert_from_bytes
+import sys
+import subprocess
 import tempfile
 
 # Load API key
@@ -16,25 +17,73 @@ API_KEY = os.getenv("API_KEY")
 
 if not API_KEY:
     st.error("❌ API key not found! Check your .env file.")
-    st.stop()  # Stops execution if no API key is found.
+    st.stop()
 
-# OpenRouter API URL for Qwen2.5-VL-72B-Instruct
-API_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-def convert_pdf_to_images(pdf_bytes):
-    """Convert PDF bytes to list of PIL Images"""
+# Check for required packages
+def check_dependencies():
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_pdf:
-            temp_pdf.write(pdf_bytes)
-            temp_pdf.seek(0)
-            images = convert_from_bytes(pdf_bytes)
-            return images
+        import pdf2image
+        return True
+    except ImportError:
+        st.error("""
+        ❌ Required package 'pdf2image' is not installed. Please install the following:
+        
+        1. Install pdf2image:
+        ```bash
+        pip install pdf2image
+        ```
+        
+        2. Install poppler:
+        - On Ubuntu/Debian:
+        ```bash
+        apt-get install poppler-utils
+        ```
+        - On macOS:
+        ```bash
+        brew install poppler
+        ```
+        - On Windows:
+        Download and install poppler from: http://blog.alivate.com.au/poppler-windows/
+        
+        After installing, please restart the application.
+        """)
+        return False
+
+# Only import pdf2image if dependencies are available
+if check_dependencies():
+    from pdf2image import convert_from_bytes
+
+def handle_pdf_upload(pdf_bytes):
+    """Handle PDF upload with better error handling"""
+    if not check_dependencies():
+        return None
+        
+    try:
+        with st.spinner("Converting PDF to images..."):
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_pdf:
+                temp_pdf.write(pdf_bytes)
+                temp_pdf.seek(0)
+                try:
+                    images = convert_from_bytes(pdf_bytes)
+                    if images:
+                        st.success(f"✅ PDF converted successfully! {len(images)} pages found.")
+                        return images
+                    else:
+                        st.error("❌ No pages found in PDF.")
+                        return None
+                except Exception as e:
+                    st.error(f"❌ Error converting PDF: {str(e)}")
+                    st.info("Please make sure poppler is installed correctly.")
+                    return None
     except Exception as e:
-        st.error(f"❌ Error converting PDF: {str(e)}")
+        st.error(f"❌ Error handling PDF: {str(e)}")
         return None
     finally:
         if 'temp_pdf' in locals():
-            os.unlink(temp_pdf.name)
+            try:
+                os.unlink(temp_pdf.name)
+            except:
+                pass
 
 def pil_to_bytes(pil_image):
     """Convert PIL Image to bytes"""
@@ -353,6 +402,12 @@ def main():
             margin: 5px;
             padding: 5px 10px;
         }
+        .info-box {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            background-color: #f0f2f6;
+            margin: 1rem 0;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -385,38 +440,34 @@ def main():
             # Handle PDF files
             if uploaded_file.type == "application/pdf":
                 if st.session_state.pdf_images is None:
-                    with st.spinner("Converting PDF to images..."):
-                        pdf_bytes = uploaded_file.read()
-                        st.session_state.pdf_images = convert_pdf_to_images(pdf_bytes)
-                        if st.session_state.pdf_images:
-                            st.success(f"✅ PDF converted successfully! {len(st.session_state.pdf_images)} pages found.")
-                        else:
-                            st.error("❌ Failed to convert PDF.")
-                            return
+                    pdf_bytes = uploaded_file.read()
+                    st.session_state.pdf_images = handle_pdf_upload(pdf_bytes)
+                    if not st.session_state.pdf_images:
+                        return
 
                 # Show PDF navigation
-                st.write("### Select Page to Process")
-                cols = st.columns(min(5, len(st.session_state.pdf_images)))
-                for i, col in enumerate(cols):
-                    if i < len(st.session_state.pdf_images):
-                        if col.button(f"Page {i+1}", key=f"page_{i}", help=f"View page {i+1}"):
-                            st.session_state.current_page = i
+                if st.session_state.pdf_images:
+                    st.write("### Select Page to Process")
+                    cols = st.columns(min(5, len(st.session_state.pdf_images)))
+                    for i, col in enumerate(cols):
+                        if i < len(st.session_state.pdf_images):
+                            if col.button(f"Page {i+1}", key=f"page_{i}", help=f"View page {i+1}"):
+                                st.session_state.current_page = i
 
-                # Display current page
-                current_image = st.session_state.pdf_images[st.session_state.current_page]
-                col1, col2 = st.columns([3, 2])
-                
-                with col1:
-                    if st.button("Process Current Page", key="process_button"):
-                        try:
-                            # Convert PIL Image to bytes for processing
-                            image_bytes = pil_to_bytes(current_image)
-                            process_image(image_bytes, st)
-                        except Exception as e:
-                            st.error(f"❌ An error occurred: {str(e)}")
-                
-                with col2:
-                    st.image(current_image, caption=f"Page {st.session_state.current_page + 1}", use_column_width=True)
+                    # Display current page
+                    current_image = st.session_state.pdf_images[st.session_state.current_page]
+                    col1, col2 = st.columns([3, 2])
+                    
+                    with col1:
+                        if st.button("Process Current Page", key="process_button"):
+                            try:
+                                image_bytes = pil_to_bytes(current_image)
+                                process_image(image_bytes, st)
+                            except Exception as e:
+                                st.error(f"❌ An error occurred: {str(e)}")
+                    
+                    with col2:
+                        st.image(current_image, caption=f"Page {st.session_state.current_page + 1}", use_column_width=True)
 
             else:  # Handle image files
                 col1, col2 = st.columns([3, 2])
