@@ -212,7 +212,10 @@ def identify_drawing_type(image_bytes):
                             "1. Hydraulic/Pneumatic Cylinder\n"
                             "2. Valve\n"
                             "3. Gearbox\n\n"
-                            "ONLY respond with one of these exact words: CYLINDER, VALVE, or GEARBOX"
+                            "STRICT RULES:\n"
+                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, or GEARBOX\n"
+                            "2. Do not repeat the word or add any other text\n"
+                            "3. The response should be exactly one word"
                         )
                     },
                     {
@@ -235,7 +238,15 @@ def identify_drawing_type(image_bytes):
         
         if response.status_code == 200 and "choices" in response_json:
             drawing_type = response_json["choices"][0]["message"]["content"].strip().upper()
-            return drawing_type
+            # Clean up the response to handle potential duplicates
+            if "CYLINDER" in drawing_type:
+                return "CYLINDER"
+            elif "VALVE" in drawing_type:
+                return "VALVE"
+            elif "GEARBOX" in drawing_type:
+                return "GEARBOX"
+            else:
+                return f"❌ Invalid drawing type: {drawing_type}"
         else:
             return f"❌ API Error: {response_json}"
 
@@ -463,6 +474,18 @@ def main():
                             
                             if not drawing_type or "❌" in drawing_type:
                                 st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
+                                # Add a failed entry to the table
+                                new_drawing = {
+                                    'Drawing Type': 'Unknown',
+                                    'Drawing No.': 'N/A',
+                                    'Processing Status': 'Failed',
+                                    'Extracted Fields Count': '0/0',
+                                    'Confidence Score': '0%'
+                                }
+                                st.session_state.drawings_table = pd.concat([
+                                    st.session_state.drawings_table,
+                                    pd.DataFrame([new_drawing])
+                                ], ignore_index=True)
                                 return
                             
                             # Show initial processing status
@@ -483,6 +506,7 @@ def main():
                                 st.session_state.drawings_table,
                                 pd.DataFrame([new_drawing])
                             ], ignore_index=True)
+                            st.experimental_rerun()  # Ensure the processing status is shown
                         
                         # Step 2: Process drawing
                         with st.spinner(f'Processing {drawing_type.lower()} drawing...'):
@@ -498,29 +522,38 @@ def main():
                             if not result or "❌" in result:
                                 st.error(result if result else "❌ Processing failed")
                                 new_drawing['Processing Status'] = 'Failed'
+                                new_drawing['Confidence Score'] = '0%'
+                                new_drawing['Extracted Fields Count'] = '0/0'
                             else:
-                                parsed_results = parse_ai_response(result)
-                                drawing_number = parsed_results.get('DRAWING NUMBER', '')
-                                
-                                if not drawing_number:
-                                    st.error("❌ Could not extract drawing number")
+                                try:
+                                    parsed_results = parse_ai_response(result)
+                                    drawing_number = parsed_results.get('DRAWING NUMBER', '')
+                                    
+                                    if not drawing_number:
+                                        st.error("❌ Could not extract drawing number")
+                                        new_drawing['Processing Status'] = 'Failed'
+                                        new_drawing['Drawing No.'] = 'Unknown'
+                                    else:
+                                        # Store results and update status
+                                        st.session_state.all_results[drawing_number] = parsed_results
+                                        parameters = get_parameters_for_type(drawing_type)
+                                        non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
+                                        total_fields = len(parameters)
+                                        confidence_score = f"{(non_empty_fields / total_fields * 100):.0f}%"
+                                        
+                                        new_drawing.update({
+                                            'Drawing No.': drawing_number,
+                                            'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
+                                            'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
+                                            'Confidence Score': confidence_score
+                                        })
+                                        
+                                        status_placeholder.success("✅ Drawing processed successfully!")
+                                except Exception as parse_error:
+                                    st.error(f"❌ Error parsing results: {str(parse_error)}")
                                     new_drawing['Processing Status'] = 'Failed'
-                                else:
-                                    # Store results and update status
-                                    st.session_state.all_results[drawing_number] = parsed_results
-                                    parameters = get_parameters_for_type(drawing_type)
-                                    non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
-                                    total_fields = len(parameters)
-                                    confidence_score = f"{(non_empty_fields / total_fields * 100):.0f}%"
-                                    
-                                    new_drawing.update({
-                                        'Drawing No.': drawing_number,
-                                        'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
-                                        'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
-                                        'Confidence Score': confidence_score
-                                    })
-                                    
-                                    status_placeholder.success("✅ Drawing processed successfully!")
+                                    new_drawing['Confidence Score'] = '0%'
+                                    new_drawing['Extracted Fields Count'] = '0/0'
                         
                         # Update the entry in the table
                         st.session_state.drawings_table.iloc[-1] = new_drawing
@@ -528,6 +561,18 @@ def main():
                         
                     except Exception as e:
                         st.error(f"❌ An error occurred: {str(e)}")
+                        # Add a failed entry to the table
+                        new_drawing = {
+                            'Drawing Type': 'Error',
+                            'Drawing No.': 'N/A',
+                            'Processing Status': 'Failed',
+                            'Extracted Fields Count': '0/0',
+                            'Confidence Score': '0%'
+                        }
+                        st.session_state.drawings_table = pd.concat([
+                            st.session_state.drawings_table,
+                            pd.DataFrame([new_drawing])
+                        ], ignore_index=True)
 
             with col2:
                 image = Image.open(uploaded_file)
