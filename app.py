@@ -173,25 +173,22 @@ def analyze_valve_image(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Analyze this valve engineering drawing carefully. This appears to be a pressure relief valve type key diagram.\n"
+                            "Analyze this valve engineering drawing carefully. Focus on extracting these specific details:\n"
                             "STRICT RULES:\n"
-                            "1) Look for the type key information and ordering example at the top of the drawing.\n"
-                            "2) Extract the model series (e.g. SPV, SPVF) from the title.\n"
-                            "3) Look for pressure ratings in bar units.\n"
-                            "4) Find the manufacturer name (e.g. KRACHT).\n"
-                            "5) Extract the complete model number from the ordering example.\n"
-                            "6) Return data in this EXACT format:\n"
-                            "MODEL: [Valve series name e.g. SPV/SPVF]\n"
-                            "CORRECT MODEL NO: [Complete model number from ordering example]\n"
-                            "PRESSURE RATING: [Pressure range in bar]\n"
-                            "MAKE: [Manufacturer name]\n"
-                            "DRAWING NUMBER: [Any visible drawing number]\n\n"
+                            "1) For Model No: Look for the complete model number including series and all specifications\n"
+                            "2) For Size: Find the nominal size/connection size of the valve (usually in mm or inches)\n"
+                            "3) For Pressure Rating: Extract the pressure rating in bar units\n"
+                            "4) For Make: Identify the manufacturer name\n"
+                            "5) Return data in this EXACT format:\n"
+                            "MODEL NO: [Complete model number with all specifications]\n"
+                            "SIZE OF VALVE: [Size in mm or inches]\n"
+                            "PRESSURE RATING: [Value in BAR]\n"
+                            "MAKE: [Manufacturer name]\n\n"
                             "Example output:\n"
-                            "MODEL: SPVF\n"
-                            "CORRECT MODEL NO: SPVF 80 A 1G 1 A12\n"
+                            "MODEL NO: SPVF 25 A 2F 1 A12\n"
+                            "SIZE OF VALVE: 25\n"
                             "PRESSURE RATING: 4...12 BAR\n"
-                            "MAKE: KRACHT\n"
-                            "DRAWING NUMBER: [number if visible]"
+                            "MAKE: KRACHT"
                         )
                     },
                     {
@@ -335,11 +332,10 @@ def get_parameters_for_type(drawing_type):
         ]
     elif drawing_type == "VALVE":
         return [
-            "MODEL",
-            "CORRECT MODEL NO",
+            "MODEL NO",
+            "SIZE OF VALVE",
             "PRESSURE RATING",
-            "MAKE",
-            "DRAWING NUMBER"
+            "MAKE"
         ]
     elif drawing_type == "GEARBOX":
         return [
