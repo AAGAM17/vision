@@ -173,22 +173,17 @@ def analyze_valve_image(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Analyze this valve engineering drawing carefully. Focus on extracting these specific details:\n"
+                            "Analyze this valve type key diagram carefully. Look at the ordering example and specifications.\n"
                             "STRICT RULES:\n"
-                            "1) For Model No: Look for the complete model number including series and all specifications\n"
-                            "2) For Size: Find the nominal size/connection size of the valve (usually in mm or inches)\n"
-                            "3) For Pressure Rating: Extract the pressure rating in bar units\n"
-                            "4) For Make: Identify the manufacturer name\n"
-                            "5) Return data in this EXACT format:\n"
-                            "MODEL NO: [Complete model number with all specifications]\n"
-                            "SIZE OF VALVE: [Size in mm or inches]\n"
-                            "PRESSURE RATING: [Value in BAR]\n"
-                            "MAKE: [Manufacturer name]\n\n"
-                            "Example output:\n"
-                            "MODEL NO: SPVF 25 A 2F 1 A12\n"
-                            "SIZE OF VALVE: 25\n"
-                            "PRESSURE RATING: 4...12 BAR\n"
-                            "MAKE: KRACHT"
+                            "1) For Model No: Extract the complete ordering example (e.g. 'SPVF M 25 A 2F 1 A12 ATEX')\n"
+                            "2) For Size: Look at the nominal size values (e.g. 20, 25, 32, 40, 50, 80)\n"
+                            "3) For Pressure Rating: Look at the pressure setting range table (e.g. '4...12 bar')\n"
+                            "4) For Make: Look at the manufacturer name at top of drawing\n"
+                            "5) Return EXACTLY in this format:\n"
+                            "MODEL NO: [Full ordering example]\n"
+                            "SIZE OF VALVE: [Nominal size]\n"
+                            "PRESSURE RATING: [Pressure range] BAR\n"
+                            "MAKE: [Manufacturer name]"
                         )
                     },
                     {
@@ -460,28 +455,29 @@ def main():
                                     })
                                 else:
                                     parsed_results = parse_ai_response(result)
-                                    drawing_number = parsed_results.get('DRAWING NUMBER', '')
                                     
-                                    if not drawing_number:
-                                        st.error("❌ Could not extract drawing number")
-                                        new_drawing.update({
-                                            'Processing Status': 'Failed',
-                                            'Drawing No.': 'Unknown'
-                                        })
+                                    # For valves, use model number as drawing number if no drawing number
+                                    if drawing_type == "VALVE":
+                                        drawing_number = parsed_results.get('MODEL NO', 'Unknown')
                                     else:
-                                        st.session_state.all_results[drawing_number] = parsed_results
-                                        parameters = get_parameters_for_type(drawing_type)
-                                        non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
-                                        total_fields = len(parameters)
-                                        
-                                        new_drawing.update({
-                                            'Drawing No.': drawing_number,
-                                            'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
-                                            'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
-                                            'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
-                                        })
-                                        
-                                        status_placeholder.success("✅ Drawing processed successfully!")
+                                        drawing_number = parsed_results.get('DRAWING NUMBER', '')
+                                    
+                                    if not drawing_number or drawing_number == 'Unknown':
+                                        drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}"
+                                    
+                                    st.session_state.all_results[drawing_number] = parsed_results
+                                    parameters = get_parameters_for_type(drawing_type)
+                                    non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
+                                    total_fields = len(parameters)
+                                    
+                                    new_drawing.update({
+                                        'Drawing No.': drawing_number,
+                                        'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
+                                        'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
+                                        'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
+                                    })
+                                    
+                                    status_placeholder.success("✅ Drawing processed successfully!")
                             
                             # Update the table
                             st.session_state.drawings_table.iloc[-1] = new_drawing
