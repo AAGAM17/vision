@@ -669,6 +669,11 @@ def main():
                     confidence = "100%" if current_value.strip() else "0%"
                     if current_value != original_value and current_value.strip():
                         confidence = "100% (Manual)"
+                    # Set specific confidence scores for CLOSE LENGTH and STROKE LENGTH
+                    if param == "CLOSE LENGTH" and current_value.strip():
+                        confidence = "80%"
+                    elif param == "STROKE LENGTH" and current_value.strip():
+                        confidence = "90%"
                     st.write(confidence)
                 
                 with col4:
