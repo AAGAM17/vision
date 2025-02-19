@@ -454,6 +454,10 @@ def main():
         st.session_state.all_results = {}
     if 'selected_drawing' not in st.session_state:
         st.session_state.selected_drawing = None
+    if 'current_image' not in st.session_state:
+        st.session_state.current_image = {}
+    if 'edited_values' not in st.session_state:
+        st.session_state.edited_values = {}
 
     # File uploader and processing section
     if st.session_state.selected_drawing is None:
@@ -594,10 +598,16 @@ def main():
         
         with image_col:
             # Display the stored image
-            if st.session_state.selected_drawing in st.session_state.current_image:
-                st.image(st.session_state.current_image[st.session_state.selected_drawing], 
-                        caption="Technical Drawing",
-                        use_column_width=True)
+            image_data = st.session_state.current_image.get(st.session_state.selected_drawing)
+            if image_data is not None:
+                try:
+                    # Convert bytes to PIL Image
+                    image = Image.open(io.BytesIO(image_data))
+                    st.image(image, caption="Technical Drawing", use_column_width=True)
+                except Exception as e:
+                    st.error("Unable to display image. Please try processing the drawing again.")
+            else:
+                st.warning("Image not available. Please try processing the drawing again.")
         
         with edit_col:
             results = st.session_state.all_results[st.session_state.selected_drawing]
@@ -605,10 +615,7 @@ def main():
                 st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
             ]['Drawing Type'].iloc[0]
             
-            # Initialize session state for edited values if not exists
-            if 'edited_values' not in st.session_state:
-                st.session_state.edited_values = {}
-            
+            # Initialize edited values for this drawing if not exists
             if st.session_state.selected_drawing not in st.session_state.edited_values:
                 st.session_state.edited_values[st.session_state.selected_drawing] = {}
             
