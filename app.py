@@ -95,7 +95,7 @@ def encode_image_to_base64(image_bytes):
     return "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode("utf-8")
 
 def parse_ai_response(response_text):
-    """Parse the AI response into a structured format. If a value is missing, return an empty string."""
+    """Parse the AI response into a structured format. If a value is missing or contains [value], return an empty string."""
     results = {}
     lines = response_text.split('\n')
     for line in lines:
@@ -103,6 +103,11 @@ def parse_ai_response(response_text):
             key, value = line.split(':', 1)
             key = key.strip().upper()
             value = value.strip()
+            
+            # Check if value contains any variation of [value] and set to empty if it does
+            if '[value]' in value.lower() or '[values]' in value.lower():
+                value = ""
+                
             results[key] = value if value else ""  # Keep blank if missing
     return results
 
@@ -124,19 +129,25 @@ def analyze_cylinder_image(image_bytes):
                             "2) Convert all measurements to specified units.\n"
                             "3) For CYLINDER ACTION, determine if SINGLE or DOUBLE action based on design.\n"
                             "4) Look for text labels and dimensions in the drawing.\n"
-                            "5) Return data in this EXACT format:\n"
+                            "5) For MOUNTING and ROD END: If value is not clearly visible or is '[value]', return empty string\n"
+                            "6) For FLUID: If fluid type is 'HLP', return 'HYD. OIL MINERAL' instead\n"
+                            "7) For OPERATING PRESSURE: Look specifically for 'OPERATING PRESSURE' or 'BETRIEBSDRUCK' value.\n"
+                            "   DO NOT use nominal pressure or other pressure values. Only use the operating pressure value.\n"
+                            "8) For OPERATING TEMPERATURE:\n"
+                            "   - If a single value is given (e.g., '60 DEG C'), use that value\n"
+                            "   - If a range is given (e.g., '40 TO 50 DEG C' or '-10°C +60°C'), use the maximum value only\n"
+                            "   - Always return just the number followed by 'DEG C'\n"
+                            "9) Return data in this EXACT format:\n"
                             "CYLINDER ACTION: [SINGLE/DOUBLE]\n"
                             "BORE DIAMETER: [value] MM\n"
-                            "OUTSIDE DIAMETER: [value] MM\n"
                             "ROD DIAMETER: [value] MM\n"
                             "STROKE LENGTH: [value] MM\n"
                             "CLOSE LENGTH: [value] MM\n"
-                            "OPEN LENGTH: [value] MM\n"
-                            "OPERATING PRESSURE: [value] BAR\n"
-                            "OPERATING TEMPERATURE: [value] DEG C\n"
-                            "MOUNTING: [value]\n"
-                            "ROD END: [value]\n"
-                            "FLUID: [value]\n"
+                            "OPERATING PRESSURE: [value from OPERATING PRESSURE/BETRIEBSDRUCK field only] BAR\n"
+                            "OPERATING TEMPERATURE: [maximum value if range, single value if no range] DEG C\n"
+                            "MOUNTING: [actual mounting type or empty string]\n"
+                            "ROD END: [actual rod end type or empty string]\n"
+                            "FLUID: [if HLP then 'HYD. OIL MINERAL', else actual fluid type]\n"
                             "DRAWING NUMBER: [value]"
                         )
                     },
@@ -156,7 +167,42 @@ def analyze_cylinder_image(image_bytes):
 
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
-        return process_api_response(response, analyze_cylinder_image, image_bytes)
+        result = process_api_response(response, analyze_cylinder_image, image_bytes)
+        if "❌" not in result:
+            # Parse results
+            parsed_results = parse_ai_response(result)
+            
+            # Clean up mounting and rod end values
+            if parsed_results.get('MOUNTING', '').strip() in ['[value]', '[Value]', '[VALUES]']:
+                parsed_results['MOUNTING'] = ''
+            if parsed_results.get('ROD END', '').strip() in ['[value]', '[Value]', '[VALUES]']:
+                parsed_results['ROD END'] = ''
+            
+            # Convert HLP to HYD. OIL MINERAL if needed
+            if parsed_results.get('FLUID', '').strip().upper() == 'HLP':
+                parsed_results['FLUID'] = 'HYD. OIL MINERAL'
+            
+            # Process temperature range to get maximum value
+            temp = parsed_results.get('OPERATING TEMPERATURE', '').strip()
+            if temp:
+                # Handle different range formats
+                if 'TO' in temp.upper():
+                    # Format: "40 TO 50 DEG C"
+                    max_temp = temp.upper().split('TO')[-1].split('DEG')[0].strip()
+                elif '+' in temp:
+                    # Format: "-10°C +60°C" or similar
+                    max_temp = temp.split('+')[-1].split('DEG')[0].strip()
+                else:
+                    # Single value or other format
+                    max_temp = temp.split('DEG')[0].strip()
+                
+                # Clean up the max temperature value
+                max_temp = ''.join(filter(lambda x: x.isdigit() or x == '.', max_temp))
+                if max_temp:
+                    parsed_results['OPERATING TEMPERATURE'] = f"{max_temp} DEG C"
+                
+            return '\n'.join([f"{k}: {v}" for k, v in parsed_results.items()])
+        return result
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
@@ -327,11 +373,9 @@ def get_parameters_for_type(drawing_type):
         return [
             "CYLINDER ACTION",
             "BORE DIAMETER",
-            "OUTSIDE DIAMETER",
             "ROD DIAMETER",
             "STROKE LENGTH",
             "CLOSE LENGTH",
-            "OPEN LENGTH",
             "OPERATING PRESSURE",
             "OPERATING TEMPERATURE",
             "MOUNTING",
