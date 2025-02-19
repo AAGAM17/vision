@@ -523,6 +523,12 @@ def main():
                                     if not drawing_number or drawing_number == 'Unknown':
                                         drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}"
                                     
+                                    # Store the image in session state for later use
+                                    if 'current_image' not in st.session_state:
+                                        st.session_state.current_image = {}
+                                    uploaded_file.seek(0)
+                                    st.session_state.current_image[drawing_number] = uploaded_file.read()
+                                    
                                     st.session_state.all_results[drawing_number] = parsed_results
                                     parameters = get_parameters_for_type(drawing_type)
                                     non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
@@ -583,143 +589,154 @@ def main():
     if st.session_state.selected_drawing and st.session_state.selected_drawing in st.session_state.all_results:
         st.write(f"### Detailed View: {st.session_state.selected_drawing}")
         
-        results = st.session_state.all_results[st.session_state.selected_drawing]
-        drawing_type = st.session_state.drawings_table[
-            st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
-        ]['Drawing Type'].iloc[0]
+        # Create two columns - one for image and one for editing
+        image_col, edit_col = st.columns([1, 2])
         
-        # Initialize session state for edited values if not exists
-        if 'edited_values' not in st.session_state:
-            st.session_state.edited_values = {}
+        with image_col:
+            # Display the stored image
+            if st.session_state.selected_drawing in st.session_state.current_image:
+                st.image(st.session_state.current_image[st.session_state.selected_drawing], 
+                        caption="Technical Drawing",
+                        use_column_width=True)
         
-        if st.session_state.selected_drawing not in st.session_state.edited_values:
-            st.session_state.edited_values[st.session_state.selected_drawing] = {}
-        
-        # Create detailed parameters table with editable fields
-        parameters = get_parameters_for_type(drawing_type)
-        st.write("Edit values that were not detected or need correction:")
-        
-        # Create columns for the table header
-        col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
-        with col1:
-            st.markdown("**Parameter**")
-        with col2:
-            st.markdown("**Value**")
-        with col3:
-            st.markdown("**Confidence**")
-        with col4:
-            st.markdown("**Status**")
-        
-        # Display each parameter with editable field
-        edited_data = []
-        for param in parameters:
+        with edit_col:
+            results = st.session_state.all_results[st.session_state.selected_drawing]
+            drawing_type = st.session_state.drawings_table[
+                st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
+            ]['Drawing Type'].iloc[0]
+            
+            # Initialize session state for edited values if not exists
+            if 'edited_values' not in st.session_state:
+                st.session_state.edited_values = {}
+            
+            if st.session_state.selected_drawing not in st.session_state.edited_values:
+                st.session_state.edited_values[st.session_state.selected_drawing] = {}
+            
+            # Create detailed parameters table with editable fields
+            parameters = get_parameters_for_type(drawing_type)
+            st.write("Edit values that were not detected or need correction:")
+            
+            # Create columns for the table header
             col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
-            
-            original_value = results.get(param, '')
-            # Get the edited value from session state if it exists, otherwise use original
-            current_value = st.session_state.edited_values[st.session_state.selected_drawing].get(
-                param, 
-                original_value
-            )
-            
             with col1:
-                st.write(param)
+                st.markdown("**Parameter**")
+            with col2:
+                st.markdown("**Value**")
+            with col3:
+                st.markdown("**Confidence**")
+            with col4:
+                st.markdown("**Status**")
+            
+            # Display each parameter with editable field
+            edited_data = []
+            for param in parameters:
+                col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
+                
+                original_value = results.get(param, '')
+                # Get the edited value from session state if it exists, otherwise use original
+                current_value = st.session_state.edited_values[st.session_state.selected_drawing].get(
+                    param, 
+                    original_value
+                )
+                
+                with col1:
+                    st.write(param)
+                
+                with col2:
+                    # Make the field editable
+                    edited_value = st.text_input(
+                        f"Edit {param}",
+                        value=current_value,
+                        key=f"edit_{param}",
+                        label_visibility="collapsed"
+                    )
+                    
+                    # Store edited value in session state if changed
+                    if edited_value != current_value:
+                        st.session_state.edited_values[st.session_state.selected_drawing][param] = edited_value
+                    
+                    # Update the value for export
+                    current_value = edited_value
+                
+                with col3:
+                    confidence = "100%" if current_value.strip() else "0%"
+                    if current_value != original_value and current_value.strip():
+                        confidence = "100% (Manual)"
+                    st.write(confidence)
+                
+                with col4:
+                    status = "✅ Auto-filled" if original_value.strip() else "🔴 Manual Required"
+                    if current_value != original_value and current_value.strip():
+                        status = "✅ Manually Filled"
+                    st.write(status)
+                
+                # Add to export data
+                edited_data.append({
+                    "Parameter": param,
+                    "Value": current_value,
+                    "Confidence": confidence,
+                    "Status": status
+                })
+            
+            # Add save, export and back buttons
+            col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
+            with col1:
+                if st.button("Back to All Drawings"):
+                    st.session_state.selected_drawing = None
+                    st.experimental_rerun()
             
             with col2:
-                # Make the field editable
-                edited_value = st.text_input(
-                    f"Edit {param}",
-                    value=current_value,
-                    key=f"edit_{param}",
-                    label_visibility="collapsed"
-                )
-                
-                # Store edited value in session state if changed
-                if edited_value != current_value:
-                    st.session_state.edited_values[st.session_state.selected_drawing][param] = edited_value
-                
-                # Update the value for export
-                current_value = edited_value
+                if st.button("Save Changes"):
+                    # Update the results with edited values
+                    for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
+                        if value.strip():  # Only update non-empty values
+                            results[param] = value
+                    st.session_state.all_results[st.session_state.selected_drawing] = results
+                    
+                    # Update the main table statistics
+                    idx = st.session_state.drawings_table[
+                        st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
+                    ].index[0]
+                    
+                    non_empty_fields = sum(1 for k in parameters if results.get(k, '').strip())
+                    total_fields = len(parameters)
+                    
+                    st.session_state.drawings_table.loc[idx, 'Extracted Fields Count'] = f"{non_empty_fields}/{total_fields}"
+                    st.session_state.drawings_table.loc[idx, 'Confidence Score'] = f"{(non_empty_fields / total_fields * 100):.0f}%"
+                    st.session_state.drawings_table.loc[idx, 'Processing Status'] = 'Completed' if non_empty_fields == total_fields else 'Needs Review!'
+                    
+                    st.success("✅ Changes saved successfully!")
             
             with col3:
-                confidence = "100%" if current_value.strip() else "0%"
-                if current_value != original_value and current_value.strip():
-                    confidence = "100% (Manual)"
-                st.write(confidence)
+                # Create DataFrame for export
+                export_df = pd.DataFrame(edited_data)
+                csv = export_df.to_csv(index=False)
+                st.download_button(
+                    label="Export to CSV",
+                    data=csv,
+                    file_name=f"{st.session_state.selected_drawing}_details.csv",
+                    mime="text/csv"
+                )
             
             with col4:
-                status = "✅ Auto-filled" if original_value.strip() else "🔴 Manual Required"
-                if current_value != original_value and current_value.strip():
-                    status = "✅ Manually Filled"
-                st.write(status)
-            
-            # Add to export data
-            edited_data.append({
-                "Parameter": param,
-                "Value": current_value,
-                "Confidence": confidence,
-                "Status": status
-            })
-        
-        # Add save, export and back buttons
-        col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
-        with col1:
-            if st.button("Back to All Drawings"):
-                st.session_state.selected_drawing = None
-                st.experimental_rerun()
-        
-        with col2:
-            if st.button("Save Changes"):
-                # Update the results with edited values
-                for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
-                    if value.strip():  # Only update non-empty values
-                        results[param] = value
-                st.session_state.all_results[st.session_state.selected_drawing] = results
+                # Create a clean format of just the values
+                values_text = "\n".join([
+                    f"{row['Value']}"
+                    for row in edited_data
+                    if row['Value'] and row['Value'] != "Not detected"
+                ])
                 
-                # Update the main table statistics
-                idx = st.session_state.drawings_table[
-                    st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
-                ].index[0]
-                
-                non_empty_fields = sum(1 for k in parameters if results.get(k, '').strip())
-                total_fields = len(parameters)
-                
-                st.session_state.drawings_table.loc[idx, 'Extracted Fields Count'] = f"{non_empty_fields}/{total_fields}"
-                st.session_state.drawings_table.loc[idx, 'Confidence Score'] = f"{(non_empty_fields / total_fields * 100):.0f}%"
-                st.session_state.drawings_table.loc[idx, 'Processing Status'] = 'Completed' if non_empty_fields == total_fields else 'Needs Review!'
-                
-                st.success("✅ Changes saved successfully!")
-        
-        with col3:
-            # Create DataFrame for export
-            export_df = pd.DataFrame(edited_data)
-            csv = export_df.to_csv(index=False)
-            st.download_button(
-                label="Export to CSV",
-                data=csv,
-                file_name=f"{st.session_state.selected_drawing}_details.csv",
-                mime="text/csv"
-            )
-        
-        with col4:
-            # Create a clean format of just the values
-            values_text = "\n".join([
-                f"{row['Value']}"
-                for row in edited_data
-                if row['Value'] and row['Value'] != "Not detected"
-            ])
-            
-            if st.button("Copy Values"):
-                st.code(values_text, language="text")
-                st.toast("✅ Values are ready to copy! Click the copy button in the code block.")
-                
-                # Also provide a download option for the values
-                st.download_button(
-                    label="Download Values as TXT",
-                    data=values_text,
-                    file_name=f"{st.session_state.selected_drawing}_values.txt",
-                    mime="text/plain"
-                )
+                if st.button("Copy Values"):
+                    st.code(values_text, language="text")
+                    st.toast("✅ Values are ready to copy! Click the copy button in the code block.")
+                    
+                    # Also provide a download option for the values
+                    st.download_button(
+                        label="Download Values as TXT",
+                        data=values_text,
+                        file_name=f"{st.session_state.selected_drawing}_values.txt",
+                        mime="text/plain"
+                    )
 
 if __name__ == "__main__":
     main()
