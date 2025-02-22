@@ -7,84 +7,128 @@ import os
 import requests
 from dotenv import load_dotenv
 
-# Load API key
+# Load API keys
 load_dotenv()
 
-API_KEY = os.getenv("API_KEY")
-API_KEY1 = os.getenv("API_KEY1")  # Add second API key
+# Get all API keys from environment variables
+API_KEYS = []
+for i in range(6):  # Check for API_KEY through API_KEY5
+    key = os.getenv(f"API_KEY{i if i > 0 else ''}")
+    if key and key.strip():
+        API_KEYS.append(key.strip())
 
-if not API_KEY and not API_KEY1:
+if not API_KEYS:
     st.error("❌ No API keys found! Check your .env file.")
     st.stop()
 
-# Initialize current API key in session state
-if 'current_api_key' not in st.session_state:
-    st.session_state.current_api_key = API_KEY
+# Initialize API key management in session state
+if 'api_key_index' not in st.session_state:
+    st.session_state.api_key_index = 0
+if 'api_key_usage' not in st.session_state:
+    st.session_state.api_key_usage = {key: 0 for key in API_KEYS}
 
-def switch_api_key():
-    """Switch between available API keys"""
-    if st.session_state.current_api_key == API_KEY and API_KEY1:
-        st.session_state.current_api_key = API_KEY1
-        return True
-    elif st.session_state.current_api_key == API_KEY1 and API_KEY:
-        st.session_state.current_api_key = API_KEY
-        return True
-    return False
+def get_next_api_key():
+    """Get the next available API key in rotation"""
+    # Get current key index
+    current_index = st.session_state.api_key_index
+    
+    # Try all keys in rotation
+    for _ in range(len(API_KEYS)):
+        # Move to next key
+        next_index = (current_index + 1) % len(API_KEYS)
+        st.session_state.api_key_index = next_index
+        
+        # Get the key
+        api_key = API_KEYS[next_index]
+        
+        # If key hasn't been used too much, use it
+        if st.session_state.api_key_usage[api_key] < 10:  # Adjust threshold as needed
+            return api_key
+            
+        # Reset usage count if all keys are heavily used
+        if _ == len(API_KEYS) - 1:
+            st.session_state.api_key_usage = {key: 0 for key in API_KEYS}
+            return API_KEYS[0]
+    
+    return API_KEYS[0]
 
 def handle_api_response(response_json, retry_func=None, *args, **kwargs):
-    """Handle API response and switch keys if needed"""
+    """Handle API response and rotate keys if needed"""
     if 'error' in response_json:
         error = response_json.get('error', {})
         if isinstance(error, dict):
             error_code = error.get('code')
-            error_message = error.get('message', '')
+            error_message = error.get('message', '').lower()
+            current_key = API_KEYS[st.session_state.api_key_index]
             
-            # Check for quota error
-            if error_code == 429 and 'quota' in error_message.lower():
-                if switch_api_key():
-                    st.warning("Switching to alternate API key due to quota limit...")
+            # Check for quota/rate limit errors
+            if error_code == 429 or 'quota' in error_message or 'rate limit' in error_message:
+                # Increment usage count for current key
+                st.session_state.api_key_usage[current_key] += 1
+                
+                # Get next key
+                next_key = get_next_api_key()
+                if next_key != current_key:
+                    st.warning(f"Switching to next API key... (Current key: ...{current_key[-6:]})")
                     if retry_func:
                         return retry_func(*args, **kwargs)
-                    return None
                 else:
                     st.error("❌ All API keys have reached their quota limits!")
                     return None
-            # Handle other specific error codes
+                    
+            # Handle other error codes
             elif error_code == 400:
                 st.error("❌ Bad request: Please check the image format")
-                return None
             elif error_code == 401:
-                st.error("❌ Authentication failed: Please check your API key")
-                return None
+                st.error(f"❌ Authentication failed for key ending in ...{current_key[-6:]}")
+                # Try next key on auth failure
+                next_key = get_next_api_key()
+                if retry_func:
+                    return retry_func(*args, **kwargs)
             elif error_code == 403:
                 st.error("❌ Access forbidden: Please check your API permissions")
-                return None
             elif error_code == 500:
                 st.error("❌ Server error: Please try again later")
-                return None
             else:
                 st.error(f"❌ API Error: {error_message}")
-                return None
+            return None
     return response_json
 
-def process_api_response(response, retry_func=None, *args, **kwargs):
-    """Process API response and handle errors"""
+def process_api_request(func, *args, **kwargs):
+    """Process API request with automatic key rotation"""
+    # Get current API key
+    current_key = API_KEYS[st.session_state.api_key_index]
+    
+    # Update headers with current key
+    headers = {
+        "Authorization": f"Bearer {current_key}",
+        "Content-Type": "application/json"
+    }
+    
     try:
+        response = requests.post(API_URL, headers=headers, json=kwargs.get('payload'))
         response_json = response.json()
         
         # Check if response is successful and contains choices
         if response.status_code == 200 and "choices" in response_json:
+            # Increment usage count for successful request
+            st.session_state.api_key_usage[current_key] += 1
             return response_json["choices"][0]["message"]["content"]
             
         # Handle API errors
-        handled_response = handle_api_response(response_json, retry_func, *args, **kwargs)
+        handled_response = handle_api_response(response_json, func, *args, **kwargs)
         if handled_response and "choices" in handled_response:
             return handled_response["choices"][0]["message"]["content"]
+            
+        # If we got an error, try with next key
+        next_key = get_next_api_key()
+        if next_key != current_key:
+            return func(*args, **kwargs)
             
         # If we get here, something went wrong
         error_msg = response_json.get('error', {}).get('message', 'Unknown error occurred')
         return f"❌ API Error: {error_msg}"
-        
+            
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
@@ -160,51 +204,7 @@ def analyze_cylinder_image(image_bytes):
         ]
     }
 
-    headers = {
-        "Authorization": f"Bearer {st.session_state.current_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        result = process_api_response(response, analyze_cylinder_image, image_bytes)
-        if "❌" not in result:
-            # Parse results
-            parsed_results = parse_ai_response(result)
-            
-            # Clean up mounting and rod end values
-            if parsed_results.get('MOUNTING', '').strip() in ['[value]', '[Value]', '[VALUES]']:
-                parsed_results['MOUNTING'] = ''
-            if parsed_results.get('ROD END', '').strip() in ['[value]', '[Value]', '[VALUES]']:
-                parsed_results['ROD END'] = ''
-            
-            # Convert HLP to HYD. OIL MINERAL if needed
-            if parsed_results.get('FLUID', '').strip().upper() == 'HLP':
-                parsed_results['FLUID'] = 'HYD. OIL MINERAL'
-            
-            # Process temperature range to get maximum value
-            temp = parsed_results.get('OPERATING TEMPERATURE', '').strip()
-            if temp:
-                # Handle different range formats
-                if 'TO' in temp.upper():
-                    # Format: "40 TO 50 DEG C"
-                    max_temp = temp.upper().split('TO')[-1].split('DEG')[0].strip()
-                elif '+' in temp:
-                    # Format: "-10°C +60°C" or similar
-                    max_temp = temp.split('+')[-1].split('DEG')[0].strip()
-                else:
-                    # Single value or other format
-                    max_temp = temp.split('DEG')[0].strip()
-                
-                # Clean up the max temperature value
-                max_temp = ''.join(filter(lambda x: x.isdigit() or x == '.', max_temp))
-                if max_temp:
-                    parsed_results['OPERATING TEMPERATURE'] = f"{max_temp} DEG C"
-                
-            return '\n'.join([f"{k}: {v}" for k, v in parsed_results.items()])
-        return result
-    except Exception as e:
-        return f"❌ Processing Error: {str(e)}"
+    return process_api_request(analyze_cylinder_image, image_bytes, payload=payload)
 
 def analyze_valve_image(image_bytes):
     """Analyze valve drawings and extract specific parameters"""
@@ -255,16 +255,7 @@ def analyze_valve_image(image_bytes):
         ]
     }
 
-    headers = {
-        "Authorization": f"Bearer {st.session_state.current_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        return process_api_response(response, analyze_valve_image, image_bytes)
-    except Exception as e:
-        return f"❌ Processing Error: {str(e)}"
+    return process_api_request(analyze_valve_image, image_bytes, payload=payload)
 
 def analyze_gearbox_image(image_bytes):
     """Analyze gearbox drawings and extract specific parameters"""
@@ -301,16 +292,7 @@ def analyze_gearbox_image(image_bytes):
         ]
     }
 
-    headers = {
-        "Authorization": f"Bearer {st.session_state.current_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        return process_api_response(response, analyze_gearbox_image, image_bytes)
-    except Exception as e:
-        return f"❌ Processing Error: {str(e)}"
+    return process_api_request(analyze_gearbox_image, image_bytes, payload=payload)
 
 def identify_drawing_type(image_bytes):
     """Identify if the drawing is a cylinder, valve, or gearbox"""
@@ -344,28 +326,7 @@ def identify_drawing_type(image_bytes):
         ]
     }
 
-    headers = {
-        "Authorization": f"Bearer {st.session_state.current_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        result = process_api_response(response, identify_drawing_type, image_bytes)
-        
-        if "❌" not in result:
-            drawing_type = result.strip().upper()
-            if "CYLINDER" in drawing_type:
-                return "CYLINDER"
-            elif "VALVE" in drawing_type:
-                return "VALVE"
-            elif "GEARBOX" in drawing_type:
-                return "GEARBOX"
-        else:
-                return f"❌ Invalid drawing type: {drawing_type}"
-        return result
-    except Exception as e:
-        return f"❌ Processing Error: {str(e)}"
+    return process_api_request(identify_drawing_type, image_bytes, payload=payload)
 
 def get_parameters_for_type(drawing_type):
     """Return the expected parameters for each drawing type"""
@@ -484,17 +445,118 @@ def main():
         /* Buttons */
         .stButton>button {
             background: linear-gradient(135deg, var(--secondary-color), #2980B9);
-            color: white;
+            color: white !important;
             border: none;
             padding: 0.75rem 1.5rem;
             border-radius: 8px;
             font-weight: 600;
             transition: all 0.3s ease;
+            width: 100%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .stButton>button:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+            background: linear-gradient(135deg, #2980B9, #2573a7);
+        }
+
+        .stButton>button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Primary button */
+        .stButton.primary>button {
+            background: linear-gradient(135deg, #3498DB, #2980B9);
+        }
+
+        /* Secondary button */
+        .stButton.secondary>button {
+            background: linear-gradient(135deg, #95A5A6, #7F8C8D);
+        }
+
+        /* Success button */
+        .stButton.success>button {
+            background: linear-gradient(135deg, #2ECC71, #27AE60);
+        }
+
+        /* Warning button */
+        .stButton.warning>button {
+            background: linear-gradient(135deg, #F1C40F, #F39C12);
+        }
+
+        /* Danger button */
+        .stButton.danger>button {
+            background: linear-gradient(135deg, #E74C3C, #C0392B);
+        }
+
+        /* Process button specific styling */
+        button[key^="process_"] {
+            background: linear-gradient(135deg, #3498DB, #2980B9) !important;
+            color: white !important;
+            font-weight: 600 !important;
+            min-width: 150px;
+        }
+
+        /* View button specific styling */
+        button[key^="view_"] {
+            background: linear-gradient(135deg, #2ECC71, #27AE60) !important;
+            color: white !important;
+            font-weight: 600 !important;
+            min-width: 100px;
+        }
+
+        /* Back button specific styling */
+        .back-button {
+            background: linear-gradient(135deg, #95A5A6, #7F8C8D) !important;
+            color: white !important;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #7F8C8D, #6C7A7A) !important;
+        }
+
+        /* Button container styling */
+        .button-container {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        /* Make sure text in buttons is always white */
+        .stButton>button>div {
+            color: white !important;
+        }
+
+        .stButton>button>div>p {
+            color: white !important;
+        }
+
+        /* Ensure button text remains visible in both modes */
+        [data-theme="light"] .stButton>button,
+        [data-theme="dark"] .stButton>button {
+            color: white !important;
+        }
+
+        [data-theme="light"] .stButton>button>div,
+        [data-theme="dark"] .stButton>button>div {
+            color: white !important;
         }
 
         /* Status badges */
