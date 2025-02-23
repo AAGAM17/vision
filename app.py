@@ -334,45 +334,8 @@ def analyze_nut_image(image_bytes):
 
     return process_api_request(analyze_nut_image, image_bytes, payload=payload)
 
-def analyze_lifting_ram_image(image_bytes):
-    """Analyze lifting ram drawings and extract specific parameters"""
-    base64_image = encode_image_to_base64(image_bytes)
-    
-    payload = {
-        "model": "qwen/qwen2.5-vl-72b-instruct:free",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Analyze this lifting ram engineering drawing and extract only the values that are clearly visible in the image.\n"
-                            "STRICT RULES:\n"
-                            "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
-                            "2) Extract and return data in this EXACT format:\n"
-                            "HEIGHT: [value] MM\n"
-                            "TOTAL STROKE: [value] MM\n"
-                            "PISTON STROKE: [value] MM\n"
-                            "PISTON LIFTING FORCE: [value] KN\n"
-                            "WEIGHT: [value] KG\n"
-                            "OIL VOLUME: [value] L\n"
-                            "DRAWING NUMBER: [Extract from Image]"
-                        )
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": base64_image
-                    }
-                ]
-            }
-        ]
-    }
-
-    return process_api_request(analyze_lifting_ram_image, image_bytes, payload=payload)
-
 def identify_drawing_type(image_bytes):
-    """Identify if the drawing is a cylinder, valve, gearbox, nut, or lifting ram"""
+    """Identify if the drawing is a cylinder, valve, gearbox, or nut"""
     base64_image = encode_image_to_base64(image_bytes)
     
     payload = {
@@ -388,10 +351,9 @@ def identify_drawing_type(image_bytes):
                             "1. Hydraulic/Pneumatic Cylinder\n"
                             "2. Valve\n"
                             "3. Gearbox\n"
-                            "4. Nut\n"
-                            "5. Lifting Ram\n\n"
+                            "4. Nut\n\n"
                             "STRICT RULES:\n"
-                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, GEARBOX, NUT, or LIFTING_RAM\n"
+                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, GEARBOX, or NUT\n"
                             "2. Do not repeat the word or add any other text\n"
                             "3. The response should be exactly one word"
                         )
@@ -451,16 +413,6 @@ def get_parameters_for_type(drawing_type):
             "THREAD PITCH",
             "COATING",
             "NUT STANDARD",
-            "DRAWING NUMBER"
-        ]
-    elif drawing_type == "LIFTING_RAM":
-        return [
-            "HEIGHT",
-            "TOTAL STROKE",
-            "PISTON STROKE",
-            "PISTON LIFTING FORCE",
-            "WEIGHT",
-            "OIL VOLUME",
             "DRAWING NUMBER"
         ]
     return []
@@ -971,83 +923,61 @@ def main():
                                     if not drawing_type or "❌" in drawing_type:
                                         st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
                                         continue
-
-                                # Step 1: Identify drawing type
-                                with st.spinner('Identifying drawing type...'):
-                                    drawing_type = identify_drawing_type(image_bytes)
+                                with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
+                                    result = None
+                                    if drawing_type == "CYLINDER":
+                                        result = analyze_cylinder_image(image_bytes)
+                                    elif drawing_type == "VALVE":
+                                        result = analyze_valve_image(image_bytes)
+                                    elif drawing_type == "GEARBOX":
+                                        result = analyze_gearbox_image(image_bytes)
+                                    elif drawing_type == "NUT":
+                                        result = analyze_nut_image(image_bytes)
                                     
-                                    if not drawing_type or "❌" in drawing_type:
-                                        st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
-                                        continue
-                                    
-                                    # Initialize new drawing entry
-                                    new_drawing = {
-                                        'Drawing Type': drawing_type,
-                                        'Drawing No.': 'Processing..',
-                                        'Processing Status': 'Processing..',
-                                        'Extracted Fields Count': '',
-                                        'Confidence Score': ''
-                                    }
-                                    
-                                    # Add to table
-                                    st.session_state.drawings_table = pd.concat([
-                                        st.session_state.drawings_table,
-                                        pd.DataFrame([new_drawing])
-                                    ], ignore_index=True)
-                                    
-                                    # Process the drawing based on type
-                                    with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
-                                        result = None
-                                        if drawing_type == "CYLINDER":
-                                            result = analyze_cylinder_image(image_bytes)
-                                        elif drawing_type == "VALVE":
-                                            result = analyze_valve_image(image_bytes)
-                                        elif drawing_type == "GEARBOX":
-                                            result = analyze_gearbox_image(image_bytes)
-                                        elif drawing_type == "NUT":
-                                            result = analyze_nut_image(image_bytes)
-                                        elif drawing_type == "LIFTING_RAM":
-                                            result = analyze_lifting_ram_image(image_bytes)
+                                    if result and "❌" not in result:
+                                        # Update with successful results
+                                        parsed_results = parse_ai_response(result)
+                                        drawing_number = (parsed_results.get('MODEL NO', '') 
+                                                        if drawing_type == "VALVE" 
+                                                        else parsed_results.get('DRAWING NUMBER', ''))
                                         
-                                        if result and "❌" not in result:
-                                            # Update with successful results
-                                            parsed_results = parse_ai_response(result)
-                                            drawing_number = (parsed_results.get('MODEL NO', '') 
-                                                            if drawing_type == "VALVE" 
-                                                            else parsed_results.get('DRAWING NUMBER', ''))
-                                            
-                                            if not drawing_number or drawing_number == 'Unknown':
-                                                drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}"
-                                            
-                                            # Store the image
-                                            file.seek(0)
-                                            st.session_state.current_image[drawing_number] = file.read()
-                                            st.session_state.all_results[drawing_number] = parsed_results
-                                            
-                                            # Update status
-                                            parameters = get_parameters_for_type(drawing_type)
-                                            non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
-                                            total_fields = len(parameters)
-                                            
-                                            new_drawing.update({
-                                                'Drawing No.': drawing_number,
-                                                'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
-                                                'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
-                                                'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
-                                            })
-                                            
-                                            st.success(f"✅ Successfully processed {file.name}")
-                                        else:
-                                            st.error(f"❌ Failed to process {file.name}")
-                                            new_drawing.update({
-                                                'Processing Status': 'Failed',
-                                                'Confidence Score': '0%',
-                                                'Extracted Fields Count': '0/0'
-                                            })
+                                        if not drawing_number or drawing_number == 'Unknown':
+                                            drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}"
                                         
-                                        # Update the table
-                                        st.session_state.drawings_table.iloc[-1] = new_drawing
+                                        # Store the image
+                                        file.seek(0)
+                                        st.session_state.current_image[drawing_number] = file.read()
+                                        st.session_state.all_results[drawing_number] = parsed_results
                                         
+                                        # Update status
+                                        parameters = get_parameters_for_type(drawing_type)
+                                        non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
+                                        total_fields = len(parameters)
+                                        
+                                        new_drawing = {
+                                            'Drawing No.': drawing_number,
+                                            'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
+                                            'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
+                                            'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
+                                        }
+                                        
+                                        st.session_state.drawings_table = pd.concat([
+                                            st.session_state.drawings_table,
+                                            pd.DataFrame([new_drawing])
+                                        ], ignore_index=True)
+                                        
+                                        st.success(f"✅ Successfully processed {file.name}")
+                                    else:
+                                        st.error(f"❌ Failed to process {file.name}")
+                                        new_drawing = {
+                                            'Processing Status': 'Failed',
+                                            'Confidence Score': '0%',
+                                            'Extracted Fields Count': '0/0'
+                                        }
+                                        
+                                    # Update the table
+                                    st.session_state.drawings_table.iloc[-1] = new_drawing
+                                    
                             except Exception as e:
                                 st.error(f"❌ Error processing {file.name}: {str(e)}")
                             
@@ -1208,6 +1138,7 @@ def main():
                 col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
                 
                 original_value = results.get(param, '')
+                # Get the edited value from session state if it exists, otherwise use original
                 current_value = st.session_state.edited_values[st.session_state.selected_drawing].get(
                     param, 
                     original_value
@@ -1217,20 +1148,26 @@ def main():
                     st.write(param)
                 
                 with col2:
+                    # Make the field editable
                     edited_value = st.text_input(
                         f"Edit {param}",
                         value=current_value,
                         key=f"edit_{param}",
                         label_visibility="collapsed"
                     )
+                    
+                    # Store edited value in session state if changed
                     if edited_value != current_value:
                         st.session_state.edited_values[st.session_state.selected_drawing][param] = edited_value
+                    
+                    # Update the value for export
                     current_value = edited_value
                 
                 with col3:
                     confidence = "100%" if current_value.strip() else "0%"
                     if current_value != original_value and current_value.strip():
                         confidence = "100% (Manual)"
+                    # Set specific confidence scores for CLOSE LENGTH and STROKE LENGTH
                     if param == "CLOSE LENGTH" and current_value.strip():
                         confidence = "80%"
                     elif param == "STROKE LENGTH" and current_value.strip():
@@ -1243,6 +1180,7 @@ def main():
                         status = "✅ Manually Filled"
                     st.write(status)
                 
+                # Add to export data
                 edited_data.append({
                     "Parameter": param,
                     "Value": current_value,
@@ -1252,6 +1190,7 @@ def main():
             
             # Add save, export and back buttons
             col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
+            
             with col1:
                 if st.button("Back to All Drawings"):
                     st.session_state.selected_drawing = None
@@ -1259,19 +1198,28 @@ def main():
             
             with col2:
                 if st.button("Save Changes"):
+                    # Update the results with edited values
                     for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
-                        if value.strip():
+                        if value.strip():  # Only update non-empty values
                             results[param] = value
                     st.session_state.all_results[st.session_state.selected_drawing] = results
-                    idx = st.session_state.drawings_table[st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing].index[0]
+                    
+                    # Update the main table statistics
+                    idx = st.session_state.drawings_table[
+                        st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
+                    ].index[0]
+                    
                     non_empty_fields = sum(1 for k in parameters if results.get(k, '').strip())
                     total_fields = len(parameters)
+                    
                     st.session_state.drawings_table.loc[idx, 'Extracted Fields Count'] = f"{non_empty_fields}/{total_fields}"
                     st.session_state.drawings_table.loc[idx, 'Confidence Score'] = f"{(non_empty_fields / total_fields * 100):.0f}%"
                     st.session_state.drawings_table.loc[idx, 'Processing Status'] = 'Completed' if non_empty_fields == total_fields else 'Needs Review!'
+                    
                     st.success("✅ Changes saved successfully!")
             
             with col3:
+                # Create DataFrame for export
                 export_df = pd.DataFrame(edited_data)
                 csv = export_df.to_csv(index=False)
                 st.download_button(
@@ -1282,6 +1230,7 @@ def main():
                 )
 
             with col4:
+                # Create a clean format of just the values
                 values_text = "\n".join([
                     f"{row['Value']}"
                     for row in edited_data
