@@ -473,7 +473,7 @@ def main():
         initial_sidebar_state="collapsed"
     )
 
-    # Custom CSS for Excel-like table and back button
+    # Custom CSS for Excel-like table
     st.markdown("""
         <style>
             .excel-table {
@@ -510,29 +510,14 @@ def main():
                 padding: 0.5rem;
                 margin-bottom: 0.5rem;
             }
-            .back-button {
-                position: absolute;
-                left: 1rem;
-                top: 0.5rem;
-                z-index: 1000;
-            }
-            .back-button button {
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-                padding: 0.5rem 1rem;
-                background-color: #28a745;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 1rem;
-                transition: background-color 0.2s;
-            }
-            .back-button button:hover {
-                background-color: #218838;
-            }
         </style>
+    """, unsafe_allow_html=True)
+
+    # Title and description
+    st.markdown("""
+        <div style="text-align: center; padding: 0.25rem 0; border-bottom: 1px solid #ddd; margin-bottom: 1rem;">
+            <h1 style="margin: 0; font-size: 1.5rem;">JSW Engineering Drawing DataSheet Extractor</h1>
+        </div>
     """, unsafe_allow_html=True)
 
     # Initialize session states
@@ -553,124 +538,64 @@ def main():
     if 'edited_values' not in st.session_state:
         st.session_state.edited_values = {}
 
-    # Back button and title
-    if st.session_state.selected_drawing:
-        st.markdown("""
-            <div class="back-button">
-                <button onclick="window.history.back()">
-                    ← Back to Drawings
-                </button>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("← Back to Drawings", key="back_button"):
-            st.session_state.selected_drawing = None
-            st.experimental_rerun()
+    # File uploader section
+    uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
-    # Title and description
-    st.markdown("""
-        <div style="text-align: center; padding: 0.25rem 0; border-bottom: 1px solid #ddd; margin-bottom: 1rem;">
-            <h1 style="margin: 0; font-size: 1.5rem;">JSW Engineering Drawing DataSheet Extractor</h1>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Main content
-    if st.session_state.selected_drawing:
-        # Display detailed view for selected drawing
-        drawing_results = st.session_state.all_results.get(st.session_state.selected_drawing, {})
-        if drawing_results:
-            st.markdown(f"### Detailed View: {st.session_state.selected_drawing}")
-            
-            # Display the drawing image if available
-            if st.session_state.selected_drawing in st.session_state.current_image:
-                image_bytes = st.session_state.current_image[st.session_state.selected_drawing]
-                st.image(image_bytes, width=400)
-            
-            # Display results in Excel-like format
-            st.markdown('<div class="excel-table">', unsafe_allow_html=True)
-            st.markdown("""
-                <div class="excel-row excel-header">
-                    <div class="excel-cell">Parameter</div>
-                    <div class="excel-cell">Value</div>
-                    <div class="excel-cell">Status</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            for param, value in drawing_results.items():
-                status = "✅ Auto-filled" if value.strip() else "❌ Not found"
-                st.markdown(f"""
-                    <div class="excel-row">
-                        <div class="excel-cell">{param}</div>
-                        <div class="excel-cell">{value}</div>
-                        <div class="excel-cell">{status}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Copy button for detailed view
-            if st.button("Copy All Values", key="copy_detailed"):
-                values_text = "\t".join([str(v) for v in drawing_results.values() if v and v.strip()])
-                st.code(values_text)
-                st.toast("✅ Values ready to copy!")
-    else:
-        # File uploader and processed drawings list
-        uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
-        
-        if uploaded_files:
-            # Display uploaded files and their status
-            for idx, file in enumerate(uploaded_files):
-                with st.container():
-                    cols = st.columns([1, 2, 1])
-                    with cols[0]:
-                        st.image(file, width=120)
+    if uploaded_files:
+        # Display uploaded files and their status
+        for idx, file in enumerate(uploaded_files):
+            with st.container():
+                cols = st.columns([1, 2, 1])
+                with cols[0]:
+                    st.image(file, width=120)
+                
+                with cols[1]:
+                    st.markdown(f"<p style='margin: 0; padding: 0.5rem 0;'><strong>{file.name}</strong></p>", unsafe_allow_html=True)
+                
+                with cols[2]:
+                    is_processed = False
+                    drawing_entry = None
+                    for _, row in st.session_state.drawings_table.iterrows():
+                        if row['Drawing No.'].endswith(file.name.split('.')[0]):
+                            is_processed = True
+                            drawing_entry = row
+                            break
                     
-                    with cols[1]:
-                        st.markdown(f"<p style='margin: 0; padding: 0.5rem 0;'><strong>{file.name}</strong></p>", unsafe_allow_html=True)
-                    
-                    with cols[2]:
-                        is_processed = False
-                        drawing_entry = None
-                        for _, row in st.session_state.drawings_table.iterrows():
-                            if row['Drawing No.'].endswith(file.name.split('.')[0]):
-                                is_processed = True
-                                drawing_entry = row
-                                break
-                        
-                        if is_processed:
-                            # Display results in Excel-like format
-                            drawing_results = st.session_state.all_results.get(drawing_entry['Drawing No.'], {})
-                            if drawing_results:
-                                st.markdown('<div class="excel-table">', unsafe_allow_html=True)
-                                # Headers
-                                st.markdown("""
-                                    <div class="excel-row excel-header">
-                                        <div class="excel-cell">Parameter</div>
-                                        <div class="excel-cell">Value</div>
-                                        <div class="excel-cell">Status</div>
+                    if is_processed:
+                        # Display results in Excel-like format
+                        drawing_results = st.session_state.all_results.get(drawing_entry['Drawing No.'], {})
+                        if drawing_results:
+                            st.markdown('<div class="excel-table">', unsafe_allow_html=True)
+                            # Headers
+                            st.markdown("""
+                                <div class="excel-row excel-header">
+                                    <div class="excel-cell">Parameter</div>
+                                    <div class="excel-cell">Value</div>
+                                    <div class="excel-cell">Status</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Values
+                            for param, value in drawing_results.items():
+                                status = "✅ Auto-filled" if value.strip() else "❌ Not found"
+                                st.markdown(f"""
+                                    <div class="excel-row">
+                                        <div class="excel-cell">{param}</div>
+                                        <div class="excel-cell">{value}</div>
+                                        <div class="excel-cell">{status}</div>
                                     </div>
                                 """, unsafe_allow_html=True)
-                                
-                                # Values
-                                for param, value in drawing_results.items():
-                                    status = "✅ Auto-filled" if value.strip() else "❌ Not found"
-                                    st.markdown(f"""
-                                        <div class="excel-row">
-                                            <div class="excel-cell">{param}</div>
-                                            <div class="excel-cell">{value}</div>
-                                            <div class="excel-cell">{status}</div>
-                                        </div>
-                                    """, unsafe_allow_html=True)
-                                st.markdown('</div>', unsafe_allow_html=True)
-                                
-                                # Copy button
-                                if st.button("Copy Values", key=f"copy_{idx}"):
-                                    # Format values for Excel (tab-separated)
-                                    values_text = "\t".join([str(v) for v in drawing_results.values() if v and v.strip()])
-                                    st.code(values_text)  # Show copyable text
-                                    st.toast("✅ Values ready to copy!")
-                        else:
-                            if st.button("Process Drawing", key=f"process_{idx}"):
-                                process_drawing(file)
+                            st.markdown('</div>', unsafe_allow_html=True)
+                            
+                            # Copy button
+                            if st.button("Copy Values", key=f"copy_{idx}"):
+                                # Format values for Excel (tab-separated)
+                                values_text = "\t".join([str(v) for v in drawing_results.values() if v and v.strip()])
+                                st.code(values_text)  # Show copyable text
+                                st.toast("✅ Values ready to copy!")
+                    else:
+                        if st.button("Process Drawing", key=f"process_{idx}"):
+                            process_drawing(file)
 
     # Show processed drawings summary
     if not st.session_state.drawings_table.empty:
