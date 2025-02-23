@@ -473,17 +473,408 @@ def main():
         initial_sidebar_state="collapsed"
     )
 
-    # Title and description - Minimal styling at top
+    # Custom CSS for better UI with dark mode support
     st.markdown("""
-        <div style="text-align: center; padding: 0.5rem 0;">
-            <h1 style="margin-bottom: 0.5rem;">JSW Engineering Drawing DataSheet Extractor</h1>
-            <p style="color: var(--text-muted); font-size: 0.9rem;">
+        <style>
+        /* Theme colors - Light Mode */
+        [data-theme="light"] {
+            --primary-color: #2C3E50;
+            --secondary-color: #3498DB;
+            --success-color: #27AE60;
+            --warning-color: #F39C12;
+            --danger-color: #E74C3C;
+            --text-color: #2C3E50;
+            --text-muted: #95A5A6;
+            --bg-light: #F8F9FA;
+            --bg-card: #FFFFFF;
+            --border-color: #E0E0E0;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Theme colors - Dark Mode */
+        [data-theme="dark"] {
+            --primary-color: #ECF0F1;
+            --secondary-color: #3498DB;
+            --success-color: #2ECC71;
+            --warning-color: #F1C40F;
+            --danger-color: #E74C3C;
+            --text-color: #ECF0F1;
+            --text-muted: #BDC3C7;
+            --bg-light: #2C3E50;
+            --bg-card: #34495E;
+            --border-color: #4A5568;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Global styles */
+        .main {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-color);
+        }
+
+        /* Card containers */
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid var(--border-color);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--primary-color);
+        }
+
+        p, span, div {
+            color: var(--text-color);
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        /* Buttons */
+        .stButton>button {
+            background: linear-gradient(135deg, var(--secondary-color), #2980B9);
+            color: white !important;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stButton>button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+            background: linear-gradient(135deg, #2980B9, #2573a7);
+        }
+
+        .stButton>button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Primary button */
+        .stButton.primary>button {
+            background: linear-gradient(135deg, #3498DB, #2980B9);
+        }
+
+        /* Secondary button */
+        .stButton.secondary>button {
+            background: linear-gradient(135deg, #95A5A6, #7F8C8D);
+        }
+
+        /* Success button */
+        .stButton.success>button {
+            background: linear-gradient(135deg, #2ECC71, #27AE60);
+        }
+
+        /* Warning button */
+        .stButton.warning>button {
+            background: linear-gradient(135deg, #F1C40F, #F39C12);
+        }
+
+        /* Danger button */
+        .stButton.danger>button {
+            background: linear-gradient(135deg, #E74C3C, #C0392B);
+        }
+
+        /* Process button specific styling */
+        button[key^="process_"] {
+            background: linear-gradient(135deg, #3498DB, #2980B9) !important;
+            color: white !important;
+            font-weight: 600 !important;
+            min-width: 150px;
+        }
+
+        /* View button specific styling */
+        button[key^="view_"] {
+            background: linear-gradient(135deg, #2ECC71, #27AE60) !important;
+            color: white !important;
+            font-weight: 600 !important;
+            min-width: 100px;
+        }
+
+        /* Back button specific styling */
+        .back-button {
+            background: linear-gradient(135deg, #95A5A6, #7F8C8D) !important;
+            color: white !important;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #7F8C8D, #6C7A7A) !important;
+        }
+
+        /* Button container styling */
+        .button-container {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        /* Make sure text in buttons is always white */
+        .stButton>button>div {
+            color: white !important;
+        }
+
+        .stButton>button>div>p {
+            color: white !important;
+        }
+
+        /* Ensure button text remains visible in both modes */
+        [data-theme="light"] .stButton>button,
+        [data-theme="dark"] .stButton>button {
+            color: white !important;
+        }
+
+        [data-theme="light"] .stButton>button>div,
+        [data-theme="dark"] .stButton>button>div {
+            color: white !important;
+        }
+
+        /* Status badges */
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        /* Progress bars */
+        .progress-bar {
+            background: var(--border-color);
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        /* Form inputs */
+        .stTextInput>div>div>input {
+            background: var(--bg-light);
+            color: var(--text-color);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+
+        .stTextInput>div>div>input:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+
+        /* Table styles */
+        .table-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .table-row {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s ease;
+        }
+
+        .table-row:hover {
+            background: var(--bg-light);
+        }
+
+        /* Image container */
+        .image-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .image-container img {
+            border-radius: 8px;
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            color: var(--text-color);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            z-index: 1000;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+        }
+
+        /* Messages */
+        .success-message, .error-message, .info-message, .warning-message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border: 1px solid transparent;
+        }
+
+        .success-message {
+            background: rgba(46, 204, 113, 0.1);
+            border-color: var(--success-color);
+            color: var(--success-color);
+        }
+
+        .error-message {
+            background: rgba(231, 76, 60, 0.1);
+            border-color: var(--danger-color);
+            color: var(--danger-color);
+        }
+
+        .warning-message {
+            background: rgba(241, 196, 15, 0.1);
+            border-color: var(--warning-color);
+            color: var(--warning-color);
+        }
+
+        .info-message {
+            background: rgba(52, 152, 219, 0.1);
+            border-color: var(--secondary-color);
+            color: var(--secondary-color);
+        }
+
+        /* Dark mode specific overrides */
+        @media (prefers-color-scheme: dark) {
+            .card {
+                background: var(--bg-card);
+            }
+            
+            .stTextInput>div>div>input {
+                background: var(--bg-light);
+            }
+            
+            .progress-bar {
+                background: rgba(255, 255, 255, 0.1);
+            }
+            
+            .tooltip:hover::after {
+                background: var(--bg-light);
+            }
+            
+            .success-message, .error-message, .info-message, .warning-message {
+                background: rgba(255, 255, 255, 0.05);
+            }
+        }
+
+        /* File uploader styling */
+        .stFileUploader > div {
+            padding: 2rem;
+            border: 2px dashed var(--secondary-color);
+            border-radius: 12px;
+            background: var(--bg-light);
+            transition: all 0.3s ease;
+            margin: 2rem auto;
+            max-width: 800px;
+        }
+        
+        .stFileUploader > div:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-card);
+            transform: translateY(-2px);
+        }
+        
+        .stFileUploader [data-testid="stFileUploadDropzone"] {
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+        }
+        
+        .stFileUploader [data-testid="stMarkdownContainer"] p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .upload-section {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .processing-queue {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background: var(--bg-card);
+        }
+        
+        .queue-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .queue-item:last-child {
+            border-bottom: none;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Title and description with modern styling
+    st.markdown("""
+        <div style="text-align: center; padding: 2rem 0;">
+            <h1>JSW Engineering Drawing DataSheet Extractor</h1>
+            <div style="color: var(--text-muted); font-size: 1.1rem; margin: 1rem 0;">
                 Automatically extract and analyze technical specifications from engineering drawings
-            </p>
+            </div>
+            <div class="progress-bar" style="max-width: 200px; margin: 2rem auto;">
+                <div class="progress-bar-fill" style="width: 100%;"></div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # Initialize session states
+    # Initialize session state
     if 'drawings_table' not in st.session_state:
         st.session_state.drawings_table = pd.DataFrame(columns=[
             'Drawing Type',
@@ -500,182 +891,402 @@ def main():
         st.session_state.current_image = {}
     if 'edited_values' not in st.session_state:
         st.session_state.edited_values = {}
-    if 'processing_queue' not in st.session_state:
-        st.session_state.processing_queue = []
-    if 'currently_processing' not in st.session_state:
-        st.session_state.currently_processing = False
 
-    # File uploader section
+    # File uploader with modern styling
     if st.session_state.selected_drawing is None:
+        # Initialize processing queue if not exists
+        if 'processing_queue' not in st.session_state:
+            st.session_state.processing_queue = []
+        if 'currently_processing' not in st.session_state:
+            st.session_state.currently_processing = False
+
+        # Custom styling for file uploader
+        st.markdown("""
+            <style>
+            .stFileUploader > div {
+                padding: 2rem;
+                border: 2px dashed var(--secondary-color);
+                border-radius: 12px;
+                background: var(--bg-light);
+                transition: all 0.3s ease;
+                margin: 2rem auto;
+                max-width: 800px;
+            }
+            
+            .stFileUploader > div:hover {
+                border-color: var(--primary-color);
+                background: var(--bg-card);
+                transform: translateY(-2px);
+            }
+            
+            .stFileUploader [data-testid="stFileUploadDropzone"] {
+                min-height: 200px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--text-muted);
+            }
+            
+            .stFileUploader [data-testid="stMarkdownContainer"] p {
+                color: var(--text-muted);
+                font-size: 0.9rem;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # Multi-file uploader without header
         uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
         if uploaded_files:
-            st.markdown("<h4>Uploaded Drawings</h4>", unsafe_allow_html=True)
-            
-            for idx, file in enumerate(uploaded_files):
-                cols = st.columns([1, 2, 1])  # Added extra column for status/buttons
-                with cols[0]:
-                    st.image(file, width=150)  # Smaller image preview
-                
-                with cols[1]:
-                    st.write(file.name)
-                    # Check if this file has been processed
-                    is_processed = False
-                    drawing_entry = None
-                    for _, row in st.session_state.drawings_table.iterrows():
-                        if row['Drawing No.'].endswith(file.name.split('.')[0]):
-                            is_processed = True
-                            drawing_entry = row
-                            break
-                
-                with cols[2]:
-                    if is_processed:
-                        st.success("✅ Processed")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button("View Results", key=f"view_{idx}"):
-                                st.session_state.selected_drawing = drawing_entry['Drawing No.']
-                                st.experimental_rerun()
-                        with col2:
-                            if st.button("Copy Values", key=f"copy_single_{idx}"):
-                                drawing_results = st.session_state.all_results.get(drawing_entry['Drawing No.'], {})
-                                if drawing_results:
-                                    values_text = "\n".join([
-                                        f"{k}: {v}"
-                                        for k, v in drawing_results.items()
-                                        if v and v.strip()
-                                    ])
-                                    st.code(values_text)
-                                    st.toast("✅ Values copied to clipboard!")
-                    else:
-                        if st.button("Process Drawing", key=f"process_{idx}"):
-                            process_drawing(file)
-                
-                st.markdown("<hr>", unsafe_allow_html=True)
+            # Add new files to processing queue
+            for uploaded_file in uploaded_files:
+                if uploaded_file not in st.session_state.processing_queue:
+                    st.session_state.processing_queue.append(uploaded_file)
 
-        # Show processed drawings table at the bottom
-        if not st.session_state.drawings_table.empty:
+            # Display uploaded files and processing options
             st.markdown("""
-                <div style="margin-top: 2rem;">
-                    <h4>Processed Drawings</h4>
+                <div class="card" style="margin-top: 2rem;">
+                    <h4 style="color: var(--primary-color); margin-bottom: 1rem;">Uploaded Drawings</h4>
                 </div>
             """, unsafe_allow_html=True)
-            
-            # Display the table with view buttons
-            for idx, row in st.session_state.drawings_table.iterrows():
-                cols = st.columns([2, 2, 2, 2, 1, 1])  # Added column for copy button
-                with cols[0]:
-                    st.write(f"**Type:** {row['Drawing Type']}")
-                with cols[1]:
-                    st.write(f"**Drawing No.:** {row['Drawing No.']}")
-                with cols[2]:
-                    st.write(f"**Status:** {row['Processing Status']}")
-                with cols[3]:
-                    st.write(f"**Confidence:** {row['Confidence Score']}")
-                with cols[4]:
-                    if st.button("View", key=f"view_table_{idx}"):
+
+            # Process each uploaded file
+            for idx, file in enumerate(uploaded_files):
+                with st.container():
+                    col1, col2 = st.columns([3, 2])
+                    with col1:
+                        st.image(file, caption=f"Preview: {file.name}", use_column_width=True)
+                    with col2:
+                        st.markdown(f"""
+                            <div class="card" style="padding: 1rem;">
+                                <strong style="color: var(--primary-color);">{file.name}</strong>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        if st.button(f"Process Drawing", key=f"process_{idx}"):
+                            try:
+                                file.seek(0)
+                                image_bytes = file.read()
+                                with st.spinner('Identifying drawing type...'):
+                                    drawing_type = identify_drawing_type(image_bytes)
+                                    if not drawing_type or "❌" in drawing_type:
+                                        st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
+                                        continue
+
+                                # Step 1: Identify drawing type
+                                with st.spinner('Identifying drawing type...'):
+                                    drawing_type = identify_drawing_type(image_bytes)
+                                    
+                                    if not drawing_type or "❌" in drawing_type:
+                                        st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
+                                        continue
+                                    
+                                    # Initialize new drawing entry
+                                    new_drawing = {
+                                        'Drawing Type': drawing_type,
+                                        'Drawing No.': 'Processing..',
+                                        'Processing Status': 'Processing..',
+                                        'Extracted Fields Count': '',
+                                        'Confidence Score': ''
+                                    }
+                                    
+                                    # Add to table
+                                    st.session_state.drawings_table = pd.concat([
+                                        st.session_state.drawings_table,
+                                        pd.DataFrame([new_drawing])
+                                    ], ignore_index=True)
+                                    
+                                    # Process the drawing based on type
+                                    with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
+                                        result = None
+                                        if drawing_type == "CYLINDER":
+                                            result = analyze_cylinder_image(image_bytes)
+                                        elif drawing_type == "VALVE":
+                                            result = analyze_valve_image(image_bytes)
+                                        elif drawing_type == "GEARBOX":
+                                            result = analyze_gearbox_image(image_bytes)
+                                        elif drawing_type == "NUT":
+                                            result = analyze_nut_image(image_bytes)
+                                        elif drawing_type == "LIFTING_RAM":
+                                            result = analyze_lifting_ram_image(image_bytes)
+                                        
+                                        if result and "❌" not in result:
+                                            # Update with successful results
+                                            parsed_results = parse_ai_response(result)
+                                            drawing_number = (parsed_results.get('MODEL NO', '') 
+                                                            if drawing_type == "VALVE" 
+                                                            else parsed_results.get('DRAWING NUMBER', ''))
+                                            
+                                            if not drawing_number or drawing_number == 'Unknown':
+                                                drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}"
+                                            
+                                            # Store the image
+                                            file.seek(0)
+                                            st.session_state.current_image[drawing_number] = file.read()
+                                            st.session_state.all_results[drawing_number] = parsed_results
+                                            
+                                            # Update status
+                                            parameters = get_parameters_for_type(drawing_type)
+                                            non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
+                                            total_fields = len(parameters)
+                                            
+                                            new_drawing.update({
+                                                'Drawing No.': drawing_number,
+                                                'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
+                                                'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
+                                                'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
+                                            })
+                                            
+                                            st.success(f"✅ Successfully processed {file.name}")
+                                        else:
+                                            st.error(f"❌ Failed to process {file.name}")
+                                            new_drawing.update({
+                                                'Processing Status': 'Failed',
+                                                'Confidence Score': '0%',
+                                                'Extracted Fields Count': '0/0'
+                                            })
+                                        
+                                        # Update the table
+                                        st.session_state.drawings_table.iloc[-1] = new_drawing
+                                        
+                            except Exception as e:
+                                st.error(f"❌ Error processing {file.name}: {str(e)}")
+                            
+                            st.experimental_rerun()
+                    
+                    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # Display the drawings table with improved styling
+    if not st.session_state.drawings_table.empty:
+        st.markdown("""
+            <div class="card">
+                <h3>Processed Drawings</h3>
+                <div style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                    View and manage your processed technical drawings
+                </div>
+                <div class="table-container">
+            """, unsafe_allow_html=True)
+        
+        # Create a clean table layout
+        for index, row in st.session_state.drawings_table.iterrows():
+            with st.container():
+                st.markdown(f"""
+                    <div class="card" style="margin-bottom: 1rem; transition: all 0.2s ease;">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                """, unsafe_allow_html=True)
+                
+                col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 1])
+                
+                with col1:
+                    st.markdown(f"""
+                        <div class="tooltip" data-tooltip="Drawing Type">
+                            <strong style="color: var(--primary-color);">{row['Drawing Type']}</strong>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f"""
+                        <div class="tooltip" data-tooltip="Drawing Number">
+                            {row['Drawing No.']}
+                        </div>
+                    """, unsafe_allow_html=True)
+                with col3:
+                    status_styles = {
+                        'Processing..': ('var(--secondary-color)', 'rgba(52, 152, 219, 0.1)'),
+                        'Completed': ('var(--success-color)', 'rgba(39, 174, 96, 0.1)'),
+                        'Needs Review!': ('var(--warning-color)', 'rgba(243, 156, 18, 0.1)'),
+                        'Failed': ('var(--danger-color)', 'rgba(231, 76, 60, 0.1)')
+                    }
+                    color, bg = status_styles.get(row['Processing Status'], ('black', 'rgba(0, 0, 0, 0.1)'))
+                    st.markdown(f"""
+                        <div class="status-badge" style="background: {bg}; color: {color};">
+                            {row['Processing Status']}
+                        </div>
+                    """, unsafe_allow_html=True)
+                with col4:
+                    fields = row['Extracted Fields Count'].split('/')
+                    percentage = (int(fields[0]) / int(fields[1])) * 100 if fields[1] != '0' else 0
+                    st.markdown(f"""
+                        <div class="tooltip" data-tooltip="Extracted Fields">
+                            <div style="margin-bottom: 0.25rem;">{row['Extracted Fields Count']}</div>
+                            <div class="progress-bar" style="height: 4px;">
+                                <div class="progress-bar-fill" style="width: {percentage}%;"></div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with col5:
+                    confidence = int(row['Confidence Score'].rstrip('%'))
+                    color = '#27AE60' if confidence >= 80 else '#F39C12' if confidence >= 50 else '#E74C3C'
+                    st.markdown(f"""
+                        <div class="tooltip" data-tooltip="Confidence Score">
+                            <div style="margin-bottom: 0.25rem;">{row['Confidence Score']}</div>
+                            <div class="progress-bar" style="height: 4px;">
+                                <div class="progress-bar-fill" style="width: {confidence}%; background: {color};"></div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with col6:
+                    if st.button('View', key=f'view_{index}'):
                         st.session_state.selected_drawing = row['Drawing No.']
                         st.experimental_rerun()
-                with cols[5]:
-                    if st.button("Copy Values", key=f"copy_{idx}"):
-                        drawing_results = st.session_state.all_results.get(row['Drawing No.'], {})
-                        if drawing_results:
-                            values_text = "\n".join([
-                                f"{k}: {v}"
-                                for k, v in drawing_results.items()
-                                if v and v.strip()
-                            ])
-                            st.code(values_text)
-                            st.toast("✅ Values copied to clipboard!")
-                st.markdown("<hr>", unsafe_allow_html=True)
-
-def process_drawing(file):
-    """Process a single drawing file"""
-    try:
-        file.seek(0)
-        image_bytes = file.read()
+                
+                st.markdown("</div></div>", unsafe_allow_html=True)
         
-        with st.spinner('Identifying drawing type...'):
-            drawing_type = identify_drawing_type(image_bytes)
-            if not drawing_type or "❌" in drawing_type:
-                st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
-                return
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
-            new_drawing = {
-                'Drawing Type': drawing_type,
-                'Drawing No.': 'Processing..',
-                'Processing Status': 'Processing..',
-                'Extracted Fields Count': '',
-                'Confidence Score': ''
-            }
+    # Detailed view with improved styling
+    if st.session_state.selected_drawing and st.session_state.selected_drawing in st.session_state.all_results:
+        st.markdown(f"""
+            <div class="card">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+                    <div>
+                        <h3 style="margin: 0;">Detailed View: {st.session_state.selected_drawing}</h3>
+                        <div style="color: var(--text-muted);">
+                            Review and edit extracted specifications
+                        </div>
+                    </div>
+                    <div class="tooltip" data-tooltip="Return to drawings list">
+                        <button class="back-button" onclick="window.history.back()">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                    </div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Create two columns with better spacing
+        image_col, edit_col = st.columns([1, 2])
+
+        with image_col:
+            st.markdown("""
+                <div class="card image-container">
+            """, unsafe_allow_html=True)
             
-            st.session_state.drawings_table = pd.concat([
-                st.session_state.drawings_table,
-                pd.DataFrame([new_drawing])
-            ], ignore_index=True)
+            image_data = st.session_state.current_image.get(st.session_state.selected_drawing)
+            if image_data is not None:
+                try:
+                    image = Image.open(io.BytesIO(image_data))
+                    st.image(image, caption="Technical Drawing", use_column_width=True)
+                except Exception as e:
+                    st.error("Unable to display image. Please try processing the drawing again.")
+            else:
+                st.warning("Image not available. Please try processing the drawing again.")
             
-            with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
-                result = analyze_drawing(drawing_type, image_bytes)
-                if result and "❌" not in result:
-                    update_drawing_results(drawing_type, result, file, new_drawing)
-                    st.success(f"✅ Successfully processed {file.name}")
-                else:
-                    handle_processing_failure(new_drawing)
-                    st.error(f"❌ Failed to process {file.name}")
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+        with edit_col:
+            st.markdown("""
+                <div class="card">
+                    <h4 style="margin-bottom: 1.5rem;">Edit Specifications</h4>
+            """, unsafe_allow_html=True)
+            
+            results = st.session_state.all_results[st.session_state.selected_drawing]
+            drawing_type = st.session_state.drawings_table[
+                st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
+            ]['Drawing Type'].iloc[0]
+            
+            # Initialize edited values for this drawing if not exists
+            if st.session_state.selected_drawing not in st.session_state.edited_values:
+                st.session_state.edited_values[st.session_state.selected_drawing] = {}
+            
+            # Create detailed parameters table with editable fields
+            parameters = get_parameters_for_type(drawing_type)
+            st.write("Edit values that were not detected or need correction:")
+            
+            # Create columns for the table header
+            col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
+            with col1:
+                st.markdown("**Parameter**")
+            with col2:
+                st.markdown("**Value**")
+            with col3:
+                st.markdown("**Confidence**")
+            with col4:
+                st.markdown("**Status**")
+            
+            # Display each parameter with editable field
+            edited_data = []
+            for param in parameters:
+                col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
                 
-                st.session_state.drawings_table.iloc[-1] = new_drawing
+                original_value = results.get(param, '')
+                current_value = st.session_state.edited_values[st.session_state.selected_drawing].get(
+                    param, 
+                    original_value
+                )
                 
-    except Exception as e:
-        st.error(f"❌ Error processing {file.name}: {str(e)}")
-    
-    st.experimental_rerun()
+                with col1:
+                    st.write(param)
+                
+                with col2:
+                    edited_value = st.text_input(
+                        f"Edit {param}",
+                        value=current_value,
+                        key=f"edit_{param}",
+                        label_visibility="collapsed"
+                    )
+                    if edited_value != current_value:
+                        st.session_state.edited_values[st.session_state.selected_drawing][param] = edited_value
+                    current_value = edited_value
+                
+                with col3:
+                    confidence = "100%" if current_value.strip() else "0%"
+                    if current_value != original_value and current_value.strip():
+                        confidence = "100% (Manual)"
+                    if param == "CLOSE LENGTH" and current_value.strip():
+                        confidence = "80%"
+                    elif param == "STROKE LENGTH" and current_value.strip():
+                        confidence = "90%"
+                    st.write(confidence)
+                
+                with col4:
+                    status = "✅ Auto-filled" if original_value.strip() else "🔴 Manual Required"
+                    if current_value != original_value and current_value.strip():
+                        status = "✅ Manually Filled"
+                    st.write(status)
+                
+                edited_data.append({
+                    "Parameter": param,
+                    "Value": current_value,
+                    "Confidence": confidence,
+                    "Status": status
+                })
+            
+            # Add save, export and back buttons
+            col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
+            with col1:
+                if st.button("Back to All Drawings"):
+                    st.session_state.selected_drawing = None
+                    st.experimental_rerun()
+            
+            with col2:
+                if st.button("Save Changes"):
+                    for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
+                        if value.strip():
+                            results[param] = value
+                    st.session_state.all_results[st.session_state.selected_drawing] = results
+                    idx = st.session_state.drawings_table[st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing].index[0]
+                    non_empty_fields = sum(1 for k in parameters if results.get(k, '').strip())
+                    total_fields = len(parameters)
+                    st.session_state.drawings_table.loc[idx, 'Extracted Fields Count'] = f"{non_empty_fields}/{total_fields}"
+                    st.session_state.drawings_table.loc[idx, 'Confidence Score'] = f"{(non_empty_fields / total_fields * 100):.0f}%"
+                    st.session_state.drawings_table.loc[idx, 'Processing Status'] = 'Completed' if non_empty_fields == total_fields else 'Needs Review!'
+                    st.success("✅ Changes saved successfully!")
+            
+            with col3:
+                export_df = pd.DataFrame(edited_data)
+                csv = export_df.to_csv(index=False)
+                st.download_button(
+                    label="Export to CSV",
+                    data=csv,
+                    file_name=f"{st.session_state.selected_drawing}_details.csv",
+                    mime="text/csv"
+                )
 
-def analyze_drawing(drawing_type, image_bytes):
-    """Analyze drawing based on its type"""
-    if drawing_type == "CYLINDER":
-        return analyze_cylinder_image(image_bytes)
-    elif drawing_type == "VALVE":
-        return analyze_valve_image(image_bytes)
-    elif drawing_type == "GEARBOX":
-        return analyze_gearbox_image(image_bytes)
-    elif drawing_type == "NUT":
-        return analyze_nut_image(image_bytes)
-    elif drawing_type == "LIFTING_RAM":
-        return analyze_lifting_ram_image(image_bytes)
-    return None
-
-def update_drawing_results(drawing_type, result, file, new_drawing):
-    """Update drawing results after successful processing"""
-    parsed_results = parse_ai_response(result)
-    drawing_number = (parsed_results.get('MODEL NO', '') 
-                     if drawing_type == "VALVE" 
-                     else parsed_results.get('DRAWING NUMBER', ''))
-    
-    if not drawing_number or drawing_number == 'Unknown':
-        drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}"
-    
-    file.seek(0)
-    st.session_state.current_image[drawing_number] = file.read()
-    st.session_state.all_results[drawing_number] = parsed_results
-    
-    parameters = get_parameters_for_type(drawing_type)
-    non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
-    total_fields = len(parameters)
-    
-    new_drawing.update({
-        'Drawing No.': drawing_number,
-        'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
-        'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
-        'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
-    })
-
-def handle_processing_failure(new_drawing):
-    """Handle drawing processing failure"""
-    new_drawing.update({
-        'Processing Status': 'Failed',
-        'Confidence Score': '0%',
-        'Extracted Fields Count': '0/0'
-    })
+            with col4:
+                values_text = "\n".join([
+                    f"{row['Value']}"
+                    for row in edited_data
+                    if row['Value'] and row['Value'] != "Not detected"
+                ])
 
 if __name__ == "__main__":
     main()
