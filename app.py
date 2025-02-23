@@ -704,27 +704,24 @@ def main():
                 </h3>
             """, unsafe_allow_html=True)
             
-            # Excel-like summary table
-            st.markdown('<div class="excel-table">', unsafe_allow_html=True)
-            st.markdown("""
-                <div class="excel-row excel-header">
-                    <div class="excel-cell">Drawing</div>
-                    <div class="excel-cell">Status</div>
-                    <div class="excel-cell">Actions</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
+            # Create columns for each drawing entry
             for idx, row in st.session_state.drawings_table.iterrows():
-                st.markdown(f"""
-                    <div class="excel-row">
-                        <div class="excel-cell">{row['Drawing Type']} - {row['Drawing No.']}</div>
-                        <div class="excel-cell">{row['Processing Status']} ({row['Confidence Score']})</div>
-                        <div class="excel-cell">
-                            <button onclick="viewResults('{row['Drawing No']}')" class="action-button">View</button>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+                with st.container():
+                    st.markdown('<div class="drawing-container">', unsafe_allow_html=True)
+                    cols = st.columns([2, 2, 1])
+                    
+                    with cols[0]:
+                        st.markdown(f"**{row['Drawing Type']} - {row['Drawing No.']}**")
+                    
+                    with cols[1]:
+                        st.markdown(f"{row['Processing Status']} ({row['Confidence Score']})")
+                    
+                    with cols[2]:
+                        if st.button("View Results", key=f"view_result_{idx}", type="primary"):
+                            st.session_state.selected_drawing = row['Drawing No.']
+                            st.experimental_rerun()
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 def process_drawing(file):
     """Process a single drawing file"""
