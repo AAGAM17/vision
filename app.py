@@ -273,13 +273,16 @@ def analyze_gearbox_image(image_bytes):
                             "Analyze the gearbox engineering drawing and extract only the values that are clearly visible in the image.\n"
                             "STRICT RULES:\n"
                             "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
-                            "2) Extract and return data in this format:\n"
-                            "GEAR RATIO: [value]\n"
-                            "SERVICE FACTOR: [value]\n"
-                            "INPUT POWER: [value] KW\n"
-                            "SHAFT TYPES: [value]\n"
-                            "NO OF SHAFT EXTENSIONS: [value]\n"
-                            "GEARBOX ORIENTATION: [value]\n"
+                            "2) Extract and return data in this EXACT format:\n"
+                            "TYPE: [value]\n"
+                            "NUMBER OF TEETH: [value]\n"
+                            "MODULE: [value]\n"
+                            "MATERIAL: [value]\n"
+                            "PRESSURE ANGLE: [value] DEG\n"
+                            "FACE WIDTH, LENGTH: [value] MM\n"
+                            "HAND: [value]\n"
+                            "MOUNTING: [value]\n"
+                            "HELIX ANGLE: [value] DEG\n"
                             "DRAWING NUMBER: [Extract from Image]"
                         )
                     },
@@ -294,8 +297,45 @@ def analyze_gearbox_image(image_bytes):
 
     return process_api_request(analyze_gearbox_image, image_bytes, payload=payload)
 
+def analyze_nut_image(image_bytes):
+    """Analyze nut drawings and extract specific parameters"""
+    base64_image = encode_image_to_base64(image_bytes)
+    
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Analyze this nut engineering drawing and extract only the values that are clearly visible in the image.\n"
+                            "STRICT RULES:\n"
+                            "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
+                            "2) Extract and return data in this EXACT format:\n"
+                            "TYPE: [value]\n"
+                            "SIZE: [value]\n"
+                            "PROPERTY CLASS: [value]\n"
+                            "THREAD PITCH: [value]\n"
+                            "COATING: [value]\n"
+                            "NUT STANDARD: [value]\n"
+                            "DRAWING NUMBER: [Extract from Image]"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
+
+    return process_api_request(analyze_nut_image, image_bytes, payload=payload)
+
 def identify_drawing_type(image_bytes):
-    """Identify if the drawing is a cylinder, valve, or gearbox"""
+    """Identify if the drawing is a cylinder, valve, gearbox, or nut"""
     base64_image = encode_image_to_base64(image_bytes)
     
     payload = {
@@ -310,9 +350,10 @@ def identify_drawing_type(image_bytes):
                             "Look at this engineering drawing and identify if it is a:\n"
                             "1. Hydraulic/Pneumatic Cylinder\n"
                             "2. Valve\n"
-                            "3. Gearbox\n\n"
+                            "3. Gearbox\n"
+                            "4. Nut\n\n"
                             "STRICT RULES:\n"
-                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, or GEARBOX\n"
+                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, GEARBOX, or NUT\n"
                             "2. Do not repeat the word or add any other text\n"
                             "3. The response should be exactly one word"
                         )
@@ -353,12 +394,25 @@ def get_parameters_for_type(drawing_type):
         ]
     elif drawing_type == "GEARBOX":
         return [
-            "GEAR RATIO",
-            "SERVICE FACTOR",
-            "INPUT POWER",
-            "SHAFT TYPES",
-            "NO OF SHAFT EXTENSIONS",
-            "GEARBOX ORIENTATION",
+            "TYPE",
+            "NUMBER OF TEETH",
+            "MODULE",
+            "MATERIAL",
+            "PRESSURE ANGLE",
+            "FACE WIDTH, LENGTH",
+            "HAND",
+            "MOUNTING",
+            "HELIX ANGLE",
+            "DRAWING NUMBER"
+        ]
+    elif drawing_type == "NUT":
+        return [
+            "TYPE",
+            "SIZE",
+            "PROPERTY CLASS",
+            "THREAD PITCH",
+            "COATING",
+            "NUT STANDARD",
             "DRAWING NUMBER"
         ]
     return []
@@ -903,6 +957,8 @@ def main():
                                             result = analyze_valve_image(image_bytes)
                                         elif drawing_type == "GEARBOX":
                                             result = analyze_gearbox_image(image_bytes)
+                                        elif drawing_type == "NUT":
+                                            result = analyze_nut_image(image_bytes)
                                         
                                         if result and "❌" not in result:
                                             # Update with successful results
