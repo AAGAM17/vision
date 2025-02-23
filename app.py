@@ -476,63 +476,40 @@ def main():
     # Custom CSS for Excel-like table
     st.markdown("""
         <style>
+            /* Base styles */
+            .main-container {
+                padding: 1rem;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            
+            /* Excel-like table */
             .excel-table {
                 border: 1px solid #ddd;
                 border-radius: 4px;
                 margin: 0.5rem 0;
+                background: white;
             }
             .excel-row {
                 display: grid;
-                grid-template-columns: minmax(150px, 2fr) minmax(150px, 2fr) minmax(100px, 1fr) minmax(80px, 0.5fr);
+                grid-template-columns: 200px 1fr 80px;
                 border-bottom: 1px solid #eee;
                 align-items: center;
             }
             .excel-header {
                 background-color: #f8f9fa;
                 font-weight: bold;
-                padding: 0.5rem;
+                padding: 0.25rem;
                 border-bottom: 2px solid #ddd;
             }
             .excel-cell {
-                padding: 0.5rem;
+                padding: 0.25rem 0.5rem;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
             }
-            .stButton button {
-                width: 100%;
-                min-height: 32px;
-                border: 1px solid #ddd !important;
-                border-radius: 4px !important;
-                background-color: #ffffff;
-                color: #333;
-                font-size: 0.9rem;
-            }
-            .drawing-container {
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 0.5rem;
-                margin-bottom: 0.5rem;
-            }
-            .drawing-grid {
-                display: grid;
-                grid-template-columns: minmax(100px, 120px) auto;
-                gap: 1rem;
-                align-items: start;
-            }
-            .section-title {
-                font-size: 1rem;
-                font-weight: 500;
-                margin: 1rem 0 0.5rem 0;
-                padding-bottom: 0.25rem;
-                border-bottom: 1px solid #eee;
-            }
-            .compact-image {
-                width: 100%;
-                max-width: 120px;
-                border-radius: 4px;
-                border: 1px solid #eee;
-            }
+            
+            /* Value cells for easy copying */
             .value-cell {
                 font-family: monospace;
                 background-color: #f8f9fa;
@@ -541,14 +518,102 @@ def main():
                 cursor: text;
                 user-select: all;
             }
+            
+            /* Drawing preview */
+            .drawing-preview {
+                width: 100px;
+                height: 100px;
+                object-fit: contain;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            
+            /* Buttons */
+            .stButton button {
+                width: 100%;
+                background-color: #ffffff !important;
+                color: #333333 !important;
+                border: 1px solid #dddddd !important;
+                border-radius: 4px !important;
+                padding: 0.25rem 0.5rem !important;
+                font-size: 0.9rem !important;
+                margin: 0 !important;
+            }
+            .action-button {
+                background-color: #28a745 !important;
+                color: white !important;
+                border: none !important;
+            }
+            .back-button {
+                position: fixed;
+                top: 1rem;
+                left: 1rem;
+                z-index: 1000;
+                background-color: #28a745 !important;
+                color: white !important;
+                border: none !important;
+                padding: 0.5rem 1rem !important;
+                border-radius: 4px !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 0.5rem !important;
+                cursor: pointer !important;
+            }
+            
+            /* Status indicators */
+            .status-badge {
+                display: inline-block;
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+                font-size: 0.8rem;
+                font-weight: 500;
+            }
+            .status-processed {
+                background-color: #d4edda;
+                color: #155724;
+            }
+            
+            /* Compact layout */
+            .drawing-container {
+                display: grid;
+                grid-template-columns: 100px 1fr;
+                gap: 1rem;
+                align-items: start;
+                padding: 0.5rem;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                margin-bottom: 0.5rem;
+            }
+            
+            /* Summary section */
+            .summary-section {
+                margin-top: 2rem;
+                padding-top: 1rem;
+                border-top: 1px solid #ddd;
+            }
+            
+            /* Dark mode compatibility */
+            @media (prefers-color-scheme: dark) {
+                .excel-table {
+                    background: #1e1e1e;
+                    border-color: #333;
+                }
+                .excel-row {
+                    border-color: #333;
+                }
+                .excel-header {
+                    background-color: #2d2d2d;
+                }
+                .value-cell {
+                    background-color: #2d2d2d;
+                }
+                .stButton button {
+                    background-color: #2d2d2d !important;
+                    color: #ffffff !important;
+                    border-color: #333333 !important;
+                }
+            }
         </style>
-    """, unsafe_allow_html=True)
-
-    # Title
-    st.markdown("""
-        <div style="text-align: center; padding: 0.25rem 0; margin-bottom: 1rem;">
-            <h1 style="margin: 0; font-size: 1.5rem;">JSW Engineering Drawing DataSheet Extractor</h1>
-        </div>
     """, unsafe_allow_html=True)
 
     # Initialize session states
@@ -564,93 +629,150 @@ def main():
         st.session_state.all_results = {}
     if 'current_image' not in st.session_state:
         st.session_state.current_image = {}
+    if 'view_mode' not in st.session_state:
+        st.session_state.view_mode = 'list'  # 'list' or 'detail'
+    if 'selected_drawing' not in st.session_state:
+        st.session_state.selected_drawing = None
 
-    # File uploader
-    uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+    # Back button (only show in detail view)
+    if st.session_state.view_mode == 'detail':
+        if st.button("← Back to Drawings", key="back_button", help="Return to drawings list"):
+            st.session_state.view_mode = 'list'
+            st.session_state.selected_drawing = None
+            st.experimental_rerun()
 
-    if uploaded_files:
-        # Process new files
-        for idx, file in enumerate(uploaded_files):
-            with st.container():
-                with st.expander(f"Drawing: {file.name}", expanded=True):
-                    cols = st.columns([1, 3])
+    # Title
+    st.markdown("""
+        <div style="text-align: center; padding: 0.25rem 0; margin-bottom: 1rem;">
+            <h1 style="margin: 0; font-size: 1.5rem;">JSW Engineering Drawing DataSheet Extractor</h1>
+        </div>
+    """, unsafe_allow_html=True)
+
+    if st.session_state.view_mode == 'list':
+        # File uploader
+        uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+
+        if uploaded_files:
+            for idx, file in enumerate(uploaded_files):
+                with st.container():
+                    drawing_key = file.name.split('.')[0]
+                    is_processed = any(row['Drawing No.'].endswith(drawing_key) for _, row in st.session_state.drawings_table.iterrows())
                     
-                    with cols[0]:
-                        st.image(file, use_column_width=True)
-                        if not any(row['Drawing No.'].endswith(file.name.split('.')[0]) for _, row in st.session_state.drawings_table.iterrows()):
+                    st.markdown(f'<div class="drawing-container">', unsafe_allow_html=True)
+                    
+                    # Left column - Image preview
+                    col1, col2 = st.columns([1, 4])
+                    with col1:
+                        st.image(file, width=100)
+                    
+                    # Right column - Info and actions
+                    with col2:
+                        if is_processed:
+                            # Get drawing info
+                            drawing_info = st.session_state.drawings_table[
+                                st.session_state.drawings_table['Drawing No.'].str.endswith(drawing_key)
+                            ].iloc[0]
+                            
+                            # Status and actions
+                            st.markdown(f"""
+                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+                                    <span class="status-badge status-processed">✓ Processed</span>
+                                    <span>{drawing_info['Drawing Type']} - {drawing_info['Drawing No.']}</span>
+                                </div>
+                            """, unsafe_allow_html=True)
+                            
+                            col1, col2, col3 = st.columns([1, 1, 1])
+                            with col1:
+                                if st.button("View Results", key=f"view_{idx}"):
+                                    st.session_state.view_mode = 'detail'
+                                    st.session_state.selected_drawing = drawing_info['Drawing No.']
+                                    st.experimental_rerun()
+                            with col2:
+                                if st.button("Copy All Values", key=f"copy_{idx}"):
+                                    drawing_results = st.session_state.all_results.get(drawing_info['Drawing No.'], {})
+                                    values_text = "\t".join([str(v) for v in drawing_results.values() if v and v.strip()])
+                                    st.code(values_text)
+                                    st.toast("✅ Values copied!")
+                            with col3:
+                                if st.button("Copy as CSV", key=f"csv_{idx}"):
+                                    drawing_results = st.session_state.all_results.get(drawing_info['Drawing No.'], {})
+                                    csv_text = "\n".join([f"{k},{v}" for k, v in drawing_results.items() if v.strip()])
+                                    st.code(csv_text)
+                                    st.toast("✅ CSV format copied!")
+                        else:
+                            st.markdown(f"<p>{file.name}</p>", unsafe_allow_html=True)
                             if st.button("Process Drawing", key=f"process_{idx}"):
                                 process_drawing(file)
                     
-                    with cols[1]:
-                        is_processed = False
-                        for _, row in st.session_state.drawings_table.iterrows():
-                            if row['Drawing No.'].endswith(file.name.split('.')[0]):
-                                is_processed = True
-                                drawing_results = st.session_state.all_results.get(row['Drawing No.'], {})
-                                
-                                # Display results in Excel-like format
-                                st.markdown('<div class="excel-table">', unsafe_allow_html=True)
-                                st.markdown("""
-                                    <div class="excel-row excel-header">
-                                        <div class="excel-cell">Parameter</div>
-                                        <div class="excel-cell">Value</div>
-                                        <div class="excel-cell">Status</div>
-                                        <div class="excel-cell">Copy</div>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                                
-                                for param, value in drawing_results.items():
-                                    status = "✅" if value.strip() else "❌"
-                                    copy_button = "📋" if value.strip() else ""
-                                    st.markdown(f"""
-                                        <div class="excel-row">
-                                            <div class="excel-cell">{param}</div>
-                                            <div class="excel-cell value-cell">{value}</div>
-                                            <div class="excel-cell">{status}</div>
-                                            <div class="excel-cell">{copy_button}</div>
-                                        </div>
-                                    """, unsafe_allow_html=True)
-                                st.markdown('</div>', unsafe_allow_html=True)
-                                
-                                # Quick copy buttons
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    if st.button("Copy All Values", key=f"copy_all_{idx}"):
-                                        values_text = "\t".join([str(v) for v in drawing_results.values() if v and v.strip()])
-                                        st.code(values_text, language="text")
-                                        st.toast("✅ Values ready to copy!")
-                                with col2:
-                                    if st.button("Copy as CSV", key=f"copy_csv_{idx}"):
-                                        csv_text = "\n".join([f"{k},{v}" for k, v in drawing_results.items() if v.strip()])
-                                        st.code(csv_text, language="text")
-                                        st.toast("✅ CSV format ready to copy!")
-                                break
+                    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Show processed drawings summary
-    if not st.session_state.drawings_table.empty:
-        st.markdown('<div class="section-title">Processed Drawings</div>', unsafe_allow_html=True)
-        
-        # Excel-like summary table
-        st.markdown('<div class="excel-table">', unsafe_allow_html=True)
-        st.markdown("""
-            <div class="excel-row excel-header">
-                <div class="excel-cell">Drawing</div>
-                <div class="excel-cell">Status</div>
-                <div class="excel-cell">Score</div>
-                <div class="excel-cell">Actions</div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        for idx, row in st.session_state.drawings_table.iterrows():
-            st.markdown(f"""
-                <div class="excel-row">
-                    <div class="excel-cell">{row['Drawing Type']} - {row['Drawing No.']}</div>
-                    <div class="excel-cell">{row['Processing Status']}</div>
-                    <div class="excel-cell">{row['Confidence Score']}</div>
-                    <div class="excel-cell">📋</div>
-                </div>
-            """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            # Show processed drawings summary
+            if not st.session_state.drawings_table.empty:
+                st.markdown("""
+                    <div class="summary-section">
+                        <h3>Processed Drawings</h3>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Excel-like summary table
+                st.markdown('<div class="excel-table">', unsafe_allow_html=True)
+                for idx, row in st.session_state.drawings_table.iterrows():
+                    st.markdown(f"""
+                        <div class="excel-row">
+                            <div class="excel-cell">{row['Drawing Type']} - {row['Drawing No.']}</div>
+                            <div class="excel-cell">{row['Processing Status']} ({row['Confidence Score']})</div>
+                            <div class="excel-cell">
+                                <button onclick="viewDrawing('{row['Drawing No']}')" class="action-button">View</button>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+    else:  # Detail view
+        if st.session_state.selected_drawing:
+            drawing_results = st.session_state.all_results.get(st.session_state.selected_drawing, {})
+            if drawing_results:
+                # Show drawing preview
+                if st.session_state.selected_drawing in st.session_state.current_image:
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        st.image(st.session_state.current_image[st.session_state.selected_drawing], width=200)
+                    with col2:
+                        st.markdown(f"### {st.session_state.selected_drawing}")
+                
+                # Excel-like results table
+                st.markdown('<div class="excel-table">', unsafe_allow_html=True)
+                st.markdown("""
+                    <div class="excel-row excel-header">
+                        <div class="excel-cell">Parameter</div>
+                        <div class="excel-cell">Value</div>
+                        <div class="excel-cell">Status</div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                for param, value in drawing_results.items():
+                    status = "✅" if value.strip() else "❌"
+                    st.markdown(f"""
+                        <div class="excel-row">
+                            <div class="excel-cell">{param}</div>
+                            <div class="excel-cell value-cell">{value}</div>
+                            <div class="excel-cell">{status}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Copy buttons
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Copy All Values"):
+                        values_text = "\t".join([str(v) for v in drawing_results.values() if v and v.strip()])
+                        st.code(values_text)
+                        st.toast("✅ Values copied!")
+                with col2:
+                    if st.button("Copy as CSV"):
+                        csv_text = "\n".join([f"{k},{v}" for k, v in drawing_results.items() if v.strip()])
+                        st.code(csv_text)
+                        st.toast("✅ CSV format copied!")
 
 def process_drawing(file):
     """Process a single drawing file"""
