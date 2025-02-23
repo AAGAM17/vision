@@ -711,76 +711,93 @@ def main():
         
         if uploaded_files:
             for idx, file in enumerate(uploaded_files):
-                file_key = file.name.split('.')[0]
-                
-                # Check if file is already processed
-                processed_row = None
-                for _, row in st.session_state.drawings_table.iterrows():
-                    if row['Drawing No.'] == file_key or row['Drawing No'].endswith(file_key):
-                        processed_row = row
-                        break
-                
-                with st.container():
-                    st.markdown('<div class="drawing-container">', unsafe_allow_html=True)
-                    cols = st.columns([1, 3, 1])
+                try:
+                    file_key = file.name.split('.')[0]
                     
-                    with cols[0]:
-                        st.image(file, width=100)
+                    # Check if file is already processed
+                    processed_row = None
+                    for _, row in st.session_state.drawings_table.iterrows():
+                        try:
+                            if row['Drawing No.'] == file_key or row['Drawing No.'].endswith(file_key):
+                                processed_row = row
+                                break
+                        except KeyError:
+                            continue  # Skip rows with missing columns
                     
-                    with cols[1]:
-                        if processed_row is not None:
-                            st.markdown(f"""
-                                <div class="status-badge status-success">✅ Processed</div>
-                                <p style="margin: 0.5rem 0;">{processed_row['Drawing Type']} - {processed_row['Drawing No.']}</p>
-                                <p style="margin: 0;">Confidence: {processed_row['Confidence Score']}</p>
-                            """, unsafe_allow_html=True)
-                        else:
-                            st.markdown("""
-                                <div class="status-badge status-pending">⏳ Pending</div>
-                            """, unsafe_allow_html=True)
-                    
-                    with cols[2]:
-                        if processed_row is not None:
-                            if st.button("View Results", key=f"view_{idx}", type="primary"):
-                                st.session_state.selected_drawing = processed_row['Drawing No.']
-                                st.experimental_rerun()
-                        else:
-                            if st.button("Process Drawing", key=f"process_{idx}", type="primary"):
-                                process_drawing(file)
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    with st.container():
+                        st.markdown('<div class="drawing-container">', unsafe_allow_html=True)
+                        cols = st.columns([1, 3, 1])
+                        
+                        with cols[0]:
+                            st.image(file, width=100)
+                        
+                        with cols[1]:
+                            if processed_row is not None:
+                                try:
+                                    st.markdown(f"""
+                                        <div class="status-badge status-success">✅ Processed</div>
+                                        <p style="margin: 0.5rem 0;">{processed_row['Drawing Type']} - {processed_row['Drawing No.']}</p>
+                                        <p style="margin: 0;">Confidence: {processed_row['Confidence Score']}</p>
+                                    """, unsafe_allow_html=True)
+                                except KeyError as e:
+                                    st.error(f"Missing column in processed row: {str(e)}")
+                            else:
+                                st.markdown("""
+                                    <div class="status-badge status-pending">⏳ Pending</div>
+                                """, unsafe_allow_html=True)
+                        
+                        with cols[2]:
+                            if processed_row is not None:
+                                if st.button("View Results", key=f"view_{idx}", type="primary"):
+                                    st.session_state.selected_drawing = processed_row['Drawing No.']
+                                    st.experimental_rerun()
+                            else:
+                                if st.button("Process Drawing", key=f"process_{idx}", type="primary"):
+                                    process_drawing(file)
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"Error processing file {file.name}: {str(e)}")
+                    continue
 
             # Show processed drawings summary
             if not st.session_state.drawings_table.empty:
-                # Filter out temporary entries
-                completed_drawings = st.session_state.drawings_table[
-                    ~st.session_state.drawings_table['Drawing No.'].str.startswith('temp_', na=False)
-                ]
-                
-                if not completed_drawings.empty:
-                    st.markdown("""
-                        <h3 style="margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid #ddd;">
-                            Processed Drawings
-                        </h3>
-                    """, unsafe_allow_html=True)
+                try:
+                    # Filter out temporary entries
+                    completed_drawings = st.session_state.drawings_table[
+                        ~st.session_state.drawings_table['Drawing No.'].str.startswith('temp_', na=False)
+                    ]
                     
-                    for idx, row in completed_drawings.iterrows():
-                        with st.container():
-                            st.markdown('<div class="drawing-container">', unsafe_allow_html=True)
-                            cols = st.columns([2, 2, 1])
-                            
-                            with cols[0]:
-                                st.markdown(f"**{row['Drawing Type']} - {row['Drawing No.']}**")
-                            
-                            with cols[1]:
-                                st.markdown(f"{row['Processing Status']} ({row['Confidence Score']})")
-                            
-                            with cols[2]:
-                                if st.button("View Results", key=f"view_result_{idx}", type="primary"):
-                                    st.session_state.selected_drawing = row['Drawing No.']
-                                    st.experimental_rerun()
-                            
-                            st.markdown('</div>', unsafe_allow_html=True)
+                    if not completed_drawings.empty:
+                        st.markdown("""
+                            <h3 style="margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid #ddd;">
+                                Processed Drawings
+                            </h3>
+                        """, unsafe_allow_html=True)
+                        
+                        for idx, row in completed_drawings.iterrows():
+                            try:
+                                with st.container():
+                                    st.markdown('<div class="drawing-container">', unsafe_allow_html=True)
+                                    cols = st.columns([2, 2, 1])
+                                    
+                                    with cols[0]:
+                                        st.markdown(f"**{row['Drawing Type']} - {row['Drawing No.']}**")
+                                    
+                                    with cols[1]:
+                                        st.markdown(f"{row['Processing Status']} ({row['Confidence Score']})")
+                                    
+                                    with cols[2]:
+                                        if st.button("View Results", key=f"view_result_{idx}", type="primary"):
+                                            st.session_state.selected_drawing = row['Drawing No.']
+                                            st.experimental_rerun()
+                                    
+                                    st.markdown('</div>', unsafe_allow_html=True)
+                            except Exception as e:
+                                st.error(f"Error displaying processed drawing: {str(e)}")
+                                continue
+                except Exception as e:
+                    st.error(f"Error processing completed drawings: {str(e)}")
 
 def process_drawing(file):
     """Process a single drawing file"""
