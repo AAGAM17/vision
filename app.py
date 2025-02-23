@@ -630,27 +630,33 @@ def main():
     if 'current_image' not in st.session_state:
         st.session_state.current_image = {}
     if 'view_mode' not in st.session_state:
-        st.session_state.view_mode = 'list'  # 'list' or 'detail'
+        st.session_state.view_mode = 'list'
     if 'selected_drawing' not in st.session_state:
         st.session_state.selected_drawing = None
 
-    # Back button (only show in detail view)
+    # Back button with arrow icon (only show in detail view)
     if st.session_state.view_mode == 'detail':
-        if st.button("← Back to Drawings", key="back_button", help="Return to drawings list"):
-            st.session_state.view_mode = 'list'
-            st.session_state.selected_drawing = None
-            st.experimental_rerun()
+        st.markdown("""
+            <button class="back-button" onclick="handleBack()">
+                ← Back to Drawings
+            </button>
+            <script>
+                function handleBack() {
+                    window.history.back();
+                }
+            </script>
+        """, unsafe_allow_html=True)
 
-    # Title
+    # Title and description
     st.markdown("""
-        <div style="text-align: center; padding: 0.25rem 0; margin-bottom: 1rem;">
-            <h1 style="margin: 0; font-size: 1.5rem;">JSW Engineering Drawing DataSheet Extractor</h1>
+        <div style="background-color: #28a745; color: white; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
+            <h1 style="margin: 0; font-size: 1.5rem; text-align: center;">JSW Engineering Drawing DataSheet Extractor</h1>
         </div>
     """, unsafe_allow_html=True)
 
     if st.session_state.view_mode == 'list':
-        # File uploader
-        uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+        # File uploader with label
+        uploaded_files = st.file_uploader("Upload Engineering Drawings", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True, label_visibility="collapsed")
 
         if uploaded_files:
             for idx, file in enumerate(uploaded_files):
@@ -686,7 +692,7 @@ def main():
                                 if st.button("View Results", key=f"view_{idx}"):
                                     st.session_state.view_mode = 'detail'
                                     st.session_state.selected_drawing = drawing_info['Drawing No.']
-                                    st.experimental_rerun()
+                                    st.rerun()
                             with col2:
                                 if st.button("Copy All Values", key=f"copy_{idx}"):
                                     drawing_results = st.session_state.all_results.get(drawing_info['Drawing No.'], {})
@@ -716,13 +722,21 @@ def main():
                 
                 # Excel-like summary table
                 st.markdown('<div class="excel-table">', unsafe_allow_html=True)
+                st.markdown("""
+                    <div class="excel-row excel-header">
+                        <div class="excel-cell">Drawing</div>
+                        <div class="excel-cell">Status</div>
+                        <div class="excel-cell">Actions</div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
                 for idx, row in st.session_state.drawings_table.iterrows():
                     st.markdown(f"""
                         <div class="excel-row">
                             <div class="excel-cell">{row['Drawing Type']} - {row['Drawing No.']}</div>
                             <div class="excel-cell">{row['Processing Status']} ({row['Confidence Score']})</div>
                             <div class="excel-cell">
-                                <button onclick="viewDrawing('{row['Drawing No']}')" class="action-button">View</button>
+                                <button class="action-button" onclick="window.location.href='#view_{row['Drawing No.']}'"">View</button>
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
@@ -813,7 +827,7 @@ def process_drawing(file):
     except Exception as e:
         st.error(f"❌ Error processing {file.name}: {str(e)}")
     
-    st.experimental_rerun()
+    st.rerun()
 
 def analyze_drawing(drawing_type, image_bytes):
     """Analyze drawing based on its type"""
