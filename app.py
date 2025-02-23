@@ -473,10 +473,13 @@ def main():
         initial_sidebar_state="collapsed"
     )
 
-    # Title and description - Even more minimal styling
+    # Title and description - Minimal styling at top
     st.markdown("""
-        <div style="text-align: center; padding: 0.25rem 0; border-bottom: 1px solid #ddd; margin-bottom: 1rem;">
-            <h1 style="margin: 0; font-size: 1.5rem;">JSW Engineering Drawing DataSheet Extractor</h1>
+        <div style="text-align: center; padding: 0.5rem 0;">
+            <h1 style="margin-bottom: 0.5rem;">JSW Engineering Drawing DataSheet Extractor</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Automatically extract and analyze technical specifications from engineering drawings
+            </p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -507,120 +510,84 @@ def main():
         uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
         if uploaded_files:
+            st.markdown("<h4>Uploaded Drawings</h4>", unsafe_allow_html=True)
+            
             for idx, file in enumerate(uploaded_files):
-                with st.container():
-                    st.markdown("""
-                        <style>
-                            .drawing-container {
-                                border: 1px solid #ddd;
-                                border-radius: 4px;
-                                padding: 0.5rem;
-                                margin-bottom: 0.5rem;
-                            }
-                            .stButton button {
-                                width: 100%;
-                                border: 1px solid #ddd !important;
-                                border-radius: 4px !important;
-                            }
-                        </style>
-                        <div class="drawing-container">
-                    """, unsafe_allow_html=True)
-                    
-                    cols = st.columns([1, 2, 1])
-                    with cols[0]:
-                        st.image(file, width=120)  # Even smaller preview
-                    
-                    with cols[1]:
-                        st.markdown(f"<p style='margin: 0; padding: 0.5rem 0;'><strong>{file.name}</strong></p>", unsafe_allow_html=True)
-                    
-                    with cols[2]:
-                        is_processed = False
-                        drawing_entry = None
-                        for _, row in st.session_state.drawings_table.iterrows():
-                            if row['Drawing No.'].endswith(file.name.split('.')[0]):
-                                is_processed = True
-                                drawing_entry = row
-                                break
-                        
-                        if is_processed:
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                if st.button("View", key=f"view_{idx}", help="View detailed results"):
-                                    st.session_state.selected_drawing = drawing_entry['Drawing No.']
-                                    st.experimental_rerun()
-                            with col2:
-                                if st.button("Copy", key=f"copy_single_{idx}", help="Copy values to clipboard"):
-                                    drawing_results = st.session_state.all_results.get(drawing_entry['Drawing No.'], {})
-                                    if drawing_results:
-                                        values_text = "\t".join([str(v) for v in drawing_results.values() if v and v.strip()])
-                                        st.write(f'<textarea id="copy_text_{idx}" style="position: absolute; left: -9999px;">{values_text}</textarea>', unsafe_allow_html=True)
-                                        st.markdown(f"""
-                                            <script>
-                                                var copyText = document.getElementById('copy_text_{idx}');
-                                                copyText.select();
-                                                document.execCommand('copy');
-                                            </script>
-                                        """, unsafe_allow_html=True)
-                                        st.toast("✅ Copied to clipboard!")
-                        else:
-                            if st.button("Process", key=f"process_{idx}", help="Process this drawing"):
-                                process_drawing(file)
-                    
-                    st.markdown("</div>", unsafe_allow_html=True)
+                cols = st.columns([1, 2, 1])  # Added extra column for status/buttons
+                with cols[0]:
+                    st.image(file, width=150)  # Smaller image preview
+                
+                with cols[1]:
+                    st.write(file.name)
+                    # Check if this file has been processed
+                    is_processed = False
+                    drawing_entry = None
+                    for _, row in st.session_state.drawings_table.iterrows():
+                        if row['Drawing No.'].endswith(file.name.split('.')[0]):
+                            is_processed = True
+                            drawing_entry = row
+                            break
+                
+                with cols[2]:
+                    if is_processed:
+                        st.success("✅ Processed")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("View Results", key=f"view_{idx}"):
+                                st.session_state.selected_drawing = drawing_entry['Drawing No.']
+                                st.experimental_rerun()
+                        with col2:
+                            if st.button("Copy Values", key=f"copy_single_{idx}"):
+                                drawing_results = st.session_state.all_results.get(drawing_entry['Drawing No.'], {})
+                                if drawing_results:
+                                    values_text = "\n".join([
+                                        f"{k}: {v}"
+                                        for k, v in drawing_results.items()
+                                        if v and v.strip()
+                                    ])
+                                    st.code(values_text)
+                                    st.toast("✅ Values copied to clipboard!")
+                    else:
+                        if st.button("Process Drawing", key=f"process_{idx}"):
+                            process_drawing(file)
+                
+                st.markdown("<hr>", unsafe_allow_html=True)
 
-        # Show processed drawings in a compact table
+        # Show processed drawings table at the bottom
         if not st.session_state.drawings_table.empty:
             st.markdown("""
-                <div style="margin-top: 1rem; border-top: 1px solid #ddd; padding-top: 1rem;">
-                    <h4 style="margin: 0 0 0.5rem 0;">Processed Drawings</h4>
+                <div style="margin-top: 2rem;">
+                    <h4>Processed Drawings</h4>
                 </div>
             """, unsafe_allow_html=True)
             
-            # Compact table with borders
-            st.markdown("""
-                <style>
-                    .compact-table {
-                        border: 1px solid #ddd;
-                        border-radius: 4px;
-                        padding: 0.5rem;
-                    }
-                    .compact-row {
-                        border-bottom: 1px solid #eee;
-                        padding: 0.25rem 0;
-                    }
-                </style>
-            """, unsafe_allow_html=True)
-            
+            # Display the table with view buttons
             for idx, row in st.session_state.drawings_table.iterrows():
-                with st.container():
-                    st.markdown('<div class="compact-row">', unsafe_allow_html=True)
-                    cols = st.columns([2, 2, 2, 1, 1])
-                    with cols[0]:
-                        st.write(f"{row['Drawing Type']} - {row['Drawing No.']}")
-                    with cols[1]:
-                        st.write(row['Processing Status'])
-                    with cols[2]:
-                        st.write(f"Confidence: {row['Confidence Score']}")
-                    with cols[3]:
-                        if st.button("View", key=f"view_table_{idx}", help="View detailed results"):
-                            st.session_state.selected_drawing = row['Drawing No.']
-                            st.experimental_rerun()
-                    with cols[4]:
-                        if st.button("Copy", key=f"copy_{idx}", help="Copy values to clipboard"):
-                            drawing_results = st.session_state.all_results.get(row['Drawing No.'], {})
-                            if drawing_results:
-                                # Format for Excel (tab-separated)
-                                values_text = "\t".join([str(v) for v in drawing_results.values() if v and v.strip()])
-                                st.write(f'<textarea id="copy_table_{idx}" style="position: absolute; left: -9999px;">{values_text}</textarea>', unsafe_allow_html=True)
-                                st.markdown(f"""
-                                    <script>
-                                        var copyText = document.getElementById('copy_table_{idx}');
-                                        copyText.select();
-                                        document.execCommand('copy');
-                                    </script>
-                                """, unsafe_allow_html=True)
-                                st.toast("✅ Copied to clipboard!")
-                    st.markdown('</div>', unsafe_allow_html=True)
+                cols = st.columns([2, 2, 2, 2, 1, 1])  # Added column for copy button
+                with cols[0]:
+                    st.write(f"**Type:** {row['Drawing Type']}")
+                with cols[1]:
+                    st.write(f"**Drawing No.:** {row['Drawing No.']}")
+                with cols[2]:
+                    st.write(f"**Status:** {row['Processing Status']}")
+                with cols[3]:
+                    st.write(f"**Confidence:** {row['Confidence Score']}")
+                with cols[4]:
+                    if st.button("View", key=f"view_table_{idx}"):
+                        st.session_state.selected_drawing = row['Drawing No.']
+                        st.experimental_rerun()
+                with cols[5]:
+                    if st.button("Copy Values", key=f"copy_{idx}"):
+                        drawing_results = st.session_state.all_results.get(row['Drawing No.'], {})
+                        if drawing_results:
+                            values_text = "\n".join([
+                                f"{k}: {v}"
+                                for k, v in drawing_results.items()
+                                if v and v.strip()
+                            ])
+                            st.code(values_text)
+                            st.toast("✅ Values copied to clipboard!")
+                st.markdown("<hr>", unsafe_allow_html=True)
 
 def process_drawing(file):
     """Process a single drawing file"""
