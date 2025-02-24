@@ -1304,14 +1304,6 @@ def main():
                 with col4:
                     fields = row['Extracted Fields Count'].split('/')
                     percentage = (int(fields[0]) / int(fields[1])) * 100 if fields[1] != '0' else 0
-                    st.markdown(f"""
-                        <div class="tooltip" data-tooltip="Extracted Fields">
-                            <div style="margin-bottom: 0.25rem;">{row['Extracted Fields Count']}</div>
-                            <div class="progress-bar" style="height: 4px;">
-                                <div class="progress-bar-fill" style="width: {percentage}%;"></div>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
                 with col5:
                     confidence = int(row['Confidence Score'].rstrip('%'))
                     color = '#27AE60' if confidence >= 80 else '#F39C12' if confidence >= 50 else '#E74C3C'
@@ -1510,28 +1502,27 @@ def main():
                     if value:  # Only include non-empty values
                         values_text.append(f"{param}\t{value}")
                 
-                # Add Copy Values button with hidden JavaScript functionality
+                # Add Copy Values button with completely hidden implementation
                 st.markdown("""
-                    <script>
-                    function copyToClipboard(text) {
-                        const textarea = document.createElement('textarea');
-                        textarea.value = text;
-                        document.body.appendChild(textarea);
-                        textarea.select();
-                        try {
-                            document.execCommand('copy');
-                            const button = document.getElementById('copyButton');
-                            button.innerHTML = '✓ Copied!';
-                            setTimeout(() => button.innerHTML = 'Copy Values', 2000);
-                        } catch (err) {
-                            console.error('Failed to copy:', err);
+                    <div style="display:none">
+                        <script>
+                        function copyToClipboard(text) {
+                            const textarea = document.createElement('textarea');
+                            textarea.value = text;
+                            document.body.appendChild(textarea);
+                            textarea.select();
+                            try {
+                                document.execCommand('copy');
+                                const button = document.getElementById('copyButton');
+                                button.innerHTML = '✓ Copied!';
+                                setTimeout(() => button.innerHTML = 'Copy Values', 2000);
+                            } catch (err) {
+                                console.error('Failed to copy:', err);
+                            }
+                            document.body.removeChild(textarea);
                         }
-                        document.body.removeChild(textarea);
-                    }
-                    </script>
-                """, unsafe_allow_html=True)
-
-                st.markdown(f"""
+                        </script>
+                    </div>
                     <button
                         id="copyButton"
                         onclick="copyToClipboard(`{('\\n'.join(values_text)).replace('"', '\\"').replace("'", "\\'")}`)"
