@@ -603,7 +603,7 @@ def main():
         .stButton>button {
             background: linear-gradient(135deg, var(--secondary-color), #2980B9);
             color: white !important;
-            border: 2px solid var(--secondary-color) !important;
+            border: none;
             padding: 0.75rem 1.5rem;
             border-radius: 8px;
             font-weight: 600;
@@ -621,37 +621,36 @@ def main():
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
             background: linear-gradient(135deg, #2980B9, #2573a7);
-            border-color: #2573a7 !important;
+        }
+
+        .stButton>button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         /* Primary button */
         .stButton.primary>button {
             background: linear-gradient(135deg, #3498DB, #2980B9);
-            border-color: #3498DB !important;
         }
 
         /* Secondary button */
         .stButton.secondary>button {
             background: linear-gradient(135deg, #95A5A6, #7F8C8D);
-            border-color: #95A5A6 !important;
         }
 
         /* Success button */
         .stButton.success>button {
             background: linear-gradient(135deg, #2ECC71, #27AE60);
-            border-color: #2ECC71 !important;
         }
 
         /* Warning button */
         .stButton.warning>button {
             background: linear-gradient(135deg, #F1C40F, #F39C12);
-            border-color: #F1C40F !important;
         }
 
         /* Danger button */
         .stButton.danger>button {
             background: linear-gradient(135deg, #E74C3C, #C0392B);
-            border-color: #E74C3C !important;
         }
 
         /* Process button specific styling */
@@ -660,7 +659,6 @@ def main():
             color: white !important;
             font-weight: 600 !important;
             min-width: 150px;
-            border: 2px solid #3498DB !important;
         }
 
         /* View button specific styling */
@@ -669,7 +667,6 @@ def main():
             color: white !important;
             font-weight: 600 !important;
             min-width: 100px;
-            border: 2px solid #2ECC71 !important;
         }
 
         /* Back button specific styling */
@@ -678,7 +675,7 @@ def main():
             color: white !important;
             padding: 0.5rem 1rem;
             border-radius: 6px;
-            border: 2px solid #95A5A6 !important;
+            border: none;
             cursor: pointer;
             font-weight: 500;
             display: inline-flex;
@@ -690,29 +687,33 @@ def main():
         .back-button:hover {
             transform: translateY(-2px);
             background: linear-gradient(135deg, #7F8C8D, #6C7A7A) !important;
-            border-color: #7F8C8D !important;
+        }
+
+        /* Button container styling */
+        .button-container {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        /* Make sure text in buttons is always white */
+        .stButton>button>div {
+            color: white !important;
+        }
+
+        .stButton>button>div>p {
+            color: white !important;
         }
 
         /* Ensure button text remains visible in both modes */
         [data-theme="light"] .stButton>button,
         [data-theme="dark"] .stButton>button {
             color: white !important;
-            border-width: 2px !important;
-            border-style: solid !important;
         }
 
         [data-theme="light"] .stButton>button>div,
         [data-theme="dark"] .stButton>button>div {
             color: white !important;
-        }
-
-        /* Light mode specific button styles */
-        [data-theme="light"] .stButton>button {
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
-        }
-
-        [data-theme="light"] .stButton>button:hover {
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
         /* Status badges */
@@ -754,76 +755,54 @@ def main():
         /* Table styles */
         .table-container {
             background: var(--bg-card);
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
             border: 1px solid var(--border-color);
-            margin-bottom: 1rem;
         }
 
-        .parameter-table {
-            width: 100%;
-            border-collapse: collapse;
+        .table-row {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s ease;
         }
 
-        .parameter-table th,
-        .parameter-table td {
-            padding: 12px 16px;
-            text-align: left;
+        .table-row:hover {
+            background: var(--bg-light);
+        }
+
+        /* Image container */
+        .image-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
             border: 1px solid var(--border-color);
         }
 
-        .parameter-table th {
-            background: var(--bg-light);
-            font-weight: 600;
+        .image-container img {
+            border-radius: 8px;
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
             color: var(--text-color);
-        }
-
-        .parameter-table td:first-child {
-            width: 40%;
-            background: var(--bg-light);
-            font-weight: 500;
-        }
-
-        .parameter-table td:last-child {
-            width: 60%;
-        }
-
-        .parameter-table tr:hover td {
-            background: rgba(52, 152, 219, 0.05);
-        }
-
-        /* Back button styling */
-        .back-button-container {
-            margin-bottom: 1rem;
-        }
-
-        .back-button {
-            background: var(--bg-light) !important;
-            color: var(--text-color) !important;
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: 1px solid var(--border-color) !important;
-            cursor: pointer;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.2s ease;
-        }
-
-        .back-button:hover {
-            background: var(--bg-card) !important;
-            border-color: var(--secondary-color) !important;
-        }
-
-        /* Dark mode table styles */
-        [data-theme="dark"] .parameter-table th,
-        [data-theme="dark"] .parameter-table td:first-child {
-            background: var(--bg-light);
-        }
-
-        [data-theme="dark"] .parameter-table tr:hover td {
-            background: rgba(52, 152, 219, 0.1);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            z-index: 1000;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
         }
 
         /* Messages */
@@ -933,108 +912,6 @@ def main():
         .drawing-actions {
             display: flex;
             gap: 0.5rem;
-        }
-
-        /* Excel-like table styling */
-        .excel-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            margin: 1rem 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .excel-table th, .excel-table td {
-            padding: 12px 15px;
-            text-align: left;
-            border: 1px solid var(--border-color);
-            background: var(--bg-card);
-        }
-
-        .excel-table th {
-            background: var(--bg-light);
-            font-weight: 600;
-            color: var(--text-color);
-            border-bottom: 2px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .excel-table td {
-            color: var(--text-color);
-            font-size: 14px;
-            line-height: 1.4;
-        }
-
-        .excel-table tr:nth-child(even) td {
-            background: var(--bg-light);
-        }
-
-        .excel-table tr:hover td {
-            background: rgba(52, 152, 219, 0.1);
-        }
-
-        /* Parameter column styling */
-        .excel-table td:first-child {
-            font-weight: 500;
-            background: var(--bg-light);
-            border-right: 2px solid var(--border-color);
-            width: 200px;
-        }
-
-        /* Value column styling */
-        .excel-table td:last-child {
-            font-family: 'Courier New', Courier, monospace;
-            padding-left: 20px;
-        }
-
-        /* Dark mode specific table styles */
-        [data-theme="dark"] .excel-table th {
-            background: var(--bg-light);
-            border-bottom: 2px solid var(--border-color);
-        }
-
-        [data-theme="dark"] .excel-table td:first-child {
-            background: var(--bg-light);
-        }
-
-        [data-theme="dark"] .excel-table tr:nth-child(even) td {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        [data-theme="dark"] .excel-table tr:hover td {
-            background: rgba(52, 152, 219, 0.2);
-        }
-
-        /* Table container for better scrolling */
-        .table-wrapper {
-            max-height: 600px;
-            overflow-y: auto;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            margin: 1rem 0;
-        }
-
-        /* Ensure clean borders */
-        .excel-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .excel-table td:last-child {
-            border-right: none;
-        }
-
-        .excel-table td:first-child {
-            border-left: none;
-        }
-
-        /* Add subtle transition */
-        .excel-table td {
-            transition: background-color 0.2s ease;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -1215,10 +1092,8 @@ def main():
                                         
                                         # Update the table
                                         st.session_state.drawings_table.iloc[-1] = new_drawing
-                                        
                             except Exception as e:
                                 st.error(f"❌ Error processing {file.name}: {str(e)}")
-                            
                             st.experimental_rerun()
                     
                     with col2_2:
@@ -1329,18 +1204,27 @@ def main():
 
     # Detailed view with improved styling
     if st.session_state.selected_drawing and st.session_state.selected_drawing in st.session_state.all_results:
-        # Back button
-        st.markdown("""
-            <div class="back-button-container">
-                <button class="back-button" onclick="window.history.back()">
-                    ← Back to All Drawings
-                </button>
+        st.markdown(f"""
+            <div class="card">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+                    <div>
+                        <h3 style="margin: 0;">Detailed View: {st.session_state.selected_drawing}</h3>
+                        <div style="color: var(--text-muted);">
+                            Review and edit extracted specifications
+                        </div>
+                    </div>
+                    <div class="tooltip" data-tooltip="Return to drawings list">
+                        <button class="back-button" onclick="window.history.back()">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                    </div>
+                </div>
             </div>
         """, unsafe_allow_html=True)
         
         # Create two columns with better spacing
-        image_col, specs_col = st.columns([1, 2])
-        
+        image_col, edit_col = st.columns([1, 2])
+
         with image_col:
             st.markdown("""
                 <div class="card image-container">
@@ -1358,10 +1242,10 @@ def main():
             
             st.markdown("</div>", unsafe_allow_html=True)
         
-        with specs_col:
+        with edit_col:
             st.markdown("""
                 <div class="card">
-                    <h4 style="margin-bottom: 1rem;">Specifications</h4>
+                    <h4 style="margin-bottom: 1.5rem;">Edit Specifications</h4>
             """, unsafe_allow_html=True)
             
             results = st.session_state.all_results[st.session_state.selected_drawing]
@@ -1369,48 +1253,120 @@ def main():
                 st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
             ]['Drawing Type'].iloc[0]
             
+            # Initialize edited values for this drawing if not exists
+            if st.session_state.selected_drawing not in st.session_state.edited_values:
+                st.session_state.edited_values[st.session_state.selected_drawing] = {}
+            
+            # Create detailed parameters table with editable fields
             parameters = get_parameters_for_type(drawing_type)
+            st.write("Edit values that were not detected or need correction:")
             
-            # Display table
-            st.markdown("""
-                <div class="table-container">
-                    <table class="parameter-table">
-                        <thead>
-                            <tr>
-                                <th>Parameter</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            """, unsafe_allow_html=True)
+            # Create columns for the table header
+            col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
+            with col1:
+                st.markdown("**Parameter**")
+            with col2:
+                st.markdown("**Value**")
+            with col3:
+                st.markdown("**Confidence**")
+            with col4:
+                st.markdown("**Status**")
             
+            # Display each parameter with editable field
+            edited_data = []
             for param in parameters:
-                value = results.get(param, '')
-                st.markdown(f"""
-                    <tr>
-                        <td>{param}</td>
-                        <td>{value}</td>
-                    </tr>
+                col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
+                
+                original_value = results.get(param, '')
+                # Get the edited value from session state if it exists, otherwise use original
+                current_value = st.session_state.edited_values[st.session_state.selected_drawing].get(
+                    param, 
+                    original_value
+                )
+                
+                with col1:
+                    st.write(param)
+                
+                with col2:
+                    # Make the field editable
+                    edited_value = st.text_input(
+                        f"Edit {param}",
+                        value=current_value,
+                        key=f"edit_{param}",
+                        label_visibility="collapsed"
+                    )
+                    
+                    # Store edited value in session state if changed
+                    if edited_value != current_value:
+                        st.session_state.edited_values[st.session_state.selected_drawing][param] = edited_value
+                    
+                    # Update the value for export
+                    current_value = edited_value
+                
+                with col3:
+                    confidence = "100%" if current_value.strip() else "0%"
+                    if current_value != original_value and current_value.strip():
+                        confidence = "100% (Manual)"
+                    # Set specific confidence scores for CLOSE LENGTH and STROKE LENGTH
+                    if param == "CLOSE LENGTH" and current_value.strip():
+                        confidence = "80%"
+                    elif param == "STROKE LENGTH" and current_value.strip():
+                        confidence = "90%"
+                    st.write(confidence)
+                
+                with col4:
+                    status = "✅ Auto-filled" if original_value.strip() else "🔴 Manual Required"
+                    if current_value != original_value and current_value.strip():
+                        status = "✅ Manually Filled"
+                    st.write(status)
+                
+                # Add to export data
+                edited_data.append({
+                    "Parameter": param,
+                    "Value": current_value,
+                    "Confidence": confidence,
+                    "Status": status
+                })
+            
+            # Add save, export and back buttons
+            col1, col2, col3 = st.columns([2, 2, 2])
+            
+            with col1:
+                st.markdown("""
+                    <div style="display: flex; align-items: center; gap: 1rem;">
                 """, unsafe_allow_html=True)
+                if st.button("Back to All Drawings", type="secondary"):
+                    st.session_state.selected_drawing = None
+                    st.experimental_rerun()
             
-            st.markdown("""
-                        </tbody>
-                    </table>
-                </div>
-            """, unsafe_allow_html=True)
+            with col2:
+                if st.button("Save Changes", type="primary"):
+                    # Update the results with edited values
+                    for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
+                        if value.strip():  # Only update non-empty values
+                            results[param] = value
+                    st.session_state.all_results[st.session_state.selected_drawing] = results
+                    st.success("✅ Changes saved successfully!")
             
-            # Add export button
-            if st.button("Export to CSV", type="primary"):
-                export_df = pd.DataFrame([{"Parameter": p, "Value": results.get(p, '')} for p in parameters])
+            with col3:
+                # Create DataFrame for export
+                export_df = pd.DataFrame(edited_data)
                 csv = export_df.to_csv(index=False)
                 st.download_button(
-                    label="Download CSV",
+                    label="Export to CSV",
                     data=csv,
-                    file_name=f"{st.session_state.selected_drawing}_specifications.csv",
-                    mime="text/csv"
+                    file_name=f"{st.session_state.selected_drawing}_details.csv",
+                    mime="text/csv",
+                    type="primary"
                 )
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+
+            with col4:
+                # Create a clean format of just the values
+                values_text = "\n".join([
+                    f"{row['Value']}"
+                    for row in edited_data
+                    if row['Value'] and row['Value'] != "Not detected"
+                ])
 
 if __name__ == "__main__":
     main()
