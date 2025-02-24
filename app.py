@@ -1494,13 +1494,10 @@ def main():
                     
                     st.success("✅ Changes saved successfully!")
                 
-                # Create a clean format of just the values
-                values_text = []
+                # Create a clean format of the table with all columns
+                values_text = ["Parameter\tValue\tConfidence\tStatus"]  # Add header row
                 for row in edited_data:
-                    param = row['Parameter']
-                    value = row['Value'].strip()
-                    if value:  # Only include non-empty values
-                        values_text.append(f"{param}\t{value}")
+                    values_text.append(f"{row['Parameter']}\t{row['Value']}\t{row['Confidence']}\t{row['Status']}")
                 
                 # Add Copy Values button with completely hidden implementation
                 st.markdown("""
