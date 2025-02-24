@@ -754,54 +754,76 @@ def main():
         /* Table styles */
         .table-container {
             background: var(--bg-card);
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+
+        .parameter-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .parameter-table th,
+        .parameter-table td {
+            padding: 12px 16px;
+            text-align: left;
             border: 1px solid var(--border-color);
         }
 
-        .table-row {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            transition: background-color 0.2s ease;
+        .parameter-table th {
+            background: var(--bg-light);
+            font-weight: 600;
+            color: var(--text-color);
         }
 
-        .table-row:hover {
+        .parameter-table td:first-child {
+            width: 40%;
+            background: var(--bg-light);
+            font-weight: 500;
+        }
+
+        .parameter-table td:last-child {
+            width: 60%;
+        }
+
+        .parameter-table tr:hover td {
+            background: rgba(52, 152, 219, 0.05);
+        }
+
+        /* Back button styling */
+        .back-button-container {
+            margin-bottom: 1rem;
+        }
+
+        .back-button {
+            background: var(--bg-light) !important;
+            color: var(--text-color) !important;
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color) !important;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .back-button:hover {
+            background: var(--bg-card) !important;
+            border-color: var(--secondary-color) !important;
+        }
+
+        /* Dark mode table styles */
+        [data-theme="dark"] .parameter-table th,
+        [data-theme="dark"] .parameter-table td:first-child {
             background: var(--bg-light);
         }
 
-        /* Image container */
-        .image-container {
-            background: var(--bg-card);
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-        }
-
-        .image-container img {
-            border-radius: 8px;
-        }
-
-        /* Tooltips */
-        .tooltip {
-            position: relative;
-            display: inline-block;
-        }
-
-        .tooltip:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 0.5rem 1rem;
-            background: var(--bg-card);
-            color: var(--text-color);
-            border-radius: 6px;
-            font-size: 0.85rem;
-            white-space: nowrap;
-            z-index: 1000;
-            border: 1px solid var(--border-color);
-            box-shadow: var(--shadow);
+        [data-theme="dark"] .parameter-table tr:hover td {
+            background: rgba(52, 152, 219, 0.1);
         }
 
         /* Messages */
@@ -1307,27 +1329,18 @@ def main():
 
     # Detailed view with improved styling
     if st.session_state.selected_drawing and st.session_state.selected_drawing in st.session_state.all_results:
-        st.markdown(f"""
-            <div class="card">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-                    <div>
-                        <h3 style="margin: 0;">Detailed View: {st.session_state.selected_drawing}</h3>
-                        <div style="color: var(--text-muted);">
-                            Review and edit extracted specifications
-                        </div>
-                    </div>
-                    <div class="tooltip" data-tooltip="Return to drawings list">
-                        <button class="back-button" onclick="window.history.back()">
-                            <i class="fas fa-arrow-left"></i> Back
-                        </button>
-                    </div>
-                </div>
+        # Back button
+        st.markdown("""
+            <div class="back-button-container">
+                <button class="back-button" onclick="window.history.back()">
+                    ← Back to All Drawings
+                </button>
             </div>
         """, unsafe_allow_html=True)
         
         # Create two columns with better spacing
-        image_col, edit_col = st.columns([1, 2])
-
+        image_col, specs_col = st.columns([1, 2])
+        
         with image_col:
             st.markdown("""
                 <div class="card image-container">
@@ -1345,10 +1358,10 @@ def main():
             
             st.markdown("</div>", unsafe_allow_html=True)
         
-        with edit_col:
+        with specs_col:
             st.markdown("""
                 <div class="card">
-                    <h4 style="margin-bottom: 1.5rem;">Edit Specifications</h4>
+                    <h4 style="margin-bottom: 1rem;">Specifications</h4>
             """, unsafe_allow_html=True)
             
             results = st.session_state.all_results[st.session_state.selected_drawing]
@@ -1356,197 +1369,48 @@ def main():
                 st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
             ]['Drawing Type'].iloc[0]
             
-            # Initialize edited values for this drawing if not exists
-            if st.session_state.selected_drawing not in st.session_state.edited_values:
-                st.session_state.edited_values[st.session_state.selected_drawing] = {}
-            
-            # Create detailed parameters table with editable fields
             parameters = get_parameters_for_type(drawing_type)
             
-            # Create Excel-like table layout
+            # Display table
             st.markdown("""
-                <style>
-                    .excel-table {
-                        width: 100%;
-                        border-collapse: separate;
-                        border-spacing: 0;
-                        margin: 1rem 0;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-                        border-radius: 8px;
-                        overflow: hidden;
-                    }
-
-                    .excel-table th, .excel-table td {
-                        padding: 12px 15px;
-                        text-align: left;
-                        border: 1px solid var(--border-color);
-                        background: var(--bg-card);
-                    }
-
-                    .excel-table th {
-                        background: var(--bg-light);
-                        font-weight: 600;
-                        color: var(--text-color);
-                        border-bottom: 2px solid var(--border-color);
-                        position: sticky;
-                        top: 0;
-                        z-index: 10;
-                    }
-
-                    .excel-table td {
-                        color: var(--text-color);
-                        font-size: 14px;
-                        line-height: 1.4;
-                    }
-
-                    .excel-table tr:nth-child(even) td {
-                        background: var(--bg-light);
-                    }
-
-                    .excel-table tr:hover td {
-                        background: rgba(52, 152, 219, 0.1);
-                    }
-
-                    /* Parameter column styling */
-                    .excel-table td:first-child {
-                        font-weight: 500;
-                        background: var(--bg-light);
-                        border-right: 2px solid var(--border-color);
-                        width: 200px;
-                    }
-
-                    /* Value column styling */
-                    .excel-table td:last-child {
-                        font-family: 'Courier New', Courier, monospace;
-                        padding-left: 20px;
-                    }
-
-                    /* Dark mode specific table styles */
-                    [data-theme="dark"] .excel-table th {
-                        background: var(--bg-light);
-                        border-bottom: 2px solid var(--border-color);
-                    }
-
-                    [data-theme="dark"] .excel-table td:first-child {
-                        background: var(--bg-light);
-                    }
-
-                    [data-theme="dark"] .excel-table tr:nth-child(even) td {
-                        background: rgba(255, 255, 255, 0.05);
-                    }
-
-                    [data-theme="dark"] .excel-table tr:hover td {
-                        background: rgba(52, 152, 219, 0.2);
-                    }
-
-                    /* Table container for better scrolling */
-                    .table-wrapper {
-                        max-height: 600px;
-                        overflow-y: auto;
-                        border-radius: 8px;
-                        border: 1px solid var(--border-color);
-                        margin: 1rem 0;
-                    }
-
-                    /* Ensure clean borders */
-                    .excel-table tr:last-child td {
-                        border-bottom: none;
-                    }
-
-                    .excel-table td:last-child {
-                        border-right: none;
-                    }
-
-                    .excel-table td:first-child {
-                        border-left: none;
-                    }
-
-                    /* Add subtle transition */
-                    .excel-table td {
-                        transition: background-color 0.2s ease;
-                    }
-                </style>
+                <div class="table-container">
+                    <table class="parameter-table">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
             """, unsafe_allow_html=True)
-            
-            # Display Excel-like table
-            st.markdown("""
-                <table class="excel-table">
-                    <thead>
-                        <tr>
-                            <th>Parameter</th>
-                            <th>Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """, unsafe_allow_html=True)
-            
-            # Store values for copying
-            copyable_values = []
             
             for param in parameters:
-                original_value = results.get(param, '')
-                current_value = st.session_state.edited_values[st.session_state.selected_drawing].get(
-                    param, 
-                    original_value
-                )
-                
-                # Add to copyable values
-                if current_value.strip():
-                    copyable_values.append(current_value)
-                
+                value = results.get(param, '')
                 st.markdown(f"""
                     <tr>
                         <td>{param}</td>
-                        <td>{current_value}</td>
+                        <td>{value}</td>
                     </tr>
                 """, unsafe_allow_html=True)
             
-            st.markdown("</tbody></table>", unsafe_allow_html=True)
-            
-            # Add copy values section
             st.markdown("""
-                <div class="copy-values-section">
-                    <h4>Quick Copy Values</h4>
-                    <p style="color: var(--text-muted);">Values are arranged vertically for easy copying and pasting:</p>
+                        </tbody>
+                    </table>
+                </div>
             """, unsafe_allow_html=True)
             
-            # Display values in a vertical format
-            values_text = "\n".join(copyable_values)
-            st.code(values_text, language=None)
-            
-            # Add copy button
-            if st.button("📋 Copy Values to Clipboard", type="primary"):
-                st.markdown(f"""
-                    <script>
-                        navigator.clipboard.writeText(`{values_text}`);
-                    </script>
-                    """, unsafe_allow_html=True)
-                st.success("✅ Values copied to clipboard!")
-            
-            # Add save and export buttons
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                if st.button("Save Changes", type="primary"):
-                    # Update the results with edited values
-                    for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
-                        if value.strip():  # Only update non-empty values
-                            results[param] = value
-                    st.session_state.all_results[st.session_state.selected_drawing] = results
-                    st.success("✅ Changes saved successfully!")
-            
-            with col2:
-                # Create DataFrame for export
-                export_df = pd.DataFrame([{"Parameter": p, "Value": v} for p, v in zip(parameters, copyable_values)])
+            # Add export button
+            if st.button("Export to CSV", type="primary"):
+                export_df = pd.DataFrame([{"Parameter": p, "Value": results.get(p, '')} for p in parameters])
                 csv = export_df.to_csv(index=False)
                 st.download_button(
-                    label="Export to CSV",
+                    label="Download CSV",
                     data=csv,
-                    file_name=f"{st.session_state.selected_drawing}_details.csv",
-                    mime="text/csv",
-                    type="primary"
+                    file_name=f"{st.session_state.selected_drawing}_specifications.csv",
+                    mime="text/csv"
                 )
+            
+            st.markdown("</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
