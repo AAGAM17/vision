@@ -913,6 +913,46 @@ def main():
             display: flex;
             gap: 0.5rem;
         }
+
+        /* Excel-like table styling */
+        .excel-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        .excel-table th, .excel-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+        .excel-table th {
+            background: var(--bg-light);
+            font-weight: 600;
+        }
+        .excel-table td {
+            background: var(--bg-card);
+        }
+        .excel-table tr:hover td {
+            background: var(--bg-light);
+        }
+        .copy-values-section {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg-light);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .values-display {
+            font-family: monospace;
+            white-space: pre;
+            padding: 1rem;
+            background: var(--bg-card);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            margin: 0.5rem 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -1261,88 +1301,110 @@ def main():
             
             # Create detailed parameters table with editable fields
             parameters = get_parameters_for_type(drawing_type)
-            st.write("Edit values that were not detected or need correction:")
             
-            # Create columns for the table header
-            col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
-            with col1:
-                st.markdown("**Parameter**")
-            with col2:
-                st.markdown("**Value**")
-            with col3:
-                st.markdown("**Confidence**")
-            with col4:
-                st.markdown("**Status**")
+            # Create Excel-like table layout
+            st.markdown("""
+                <style>
+                    .excel-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 1rem 0;
+                    }
+                    .excel-table th, .excel-table td {
+                        padding: 8px 12px;
+                        text-align: left;
+                        border: 1px solid var(--border-color);
+                    }
+                    .excel-table th {
+                        background: var(--bg-light);
+                        font-weight: 600;
+                    }
+                    .excel-table td {
+                        background: var(--bg-card);
+                    }
+                    .excel-table tr:hover td {
+                        background: var(--bg-light);
+                    }
+                    .copy-values-section {
+                        margin-top: 1rem;
+                        padding: 1rem;
+                        background: var(--bg-light);
+                        border-radius: 8px;
+                        border: 1px solid var(--border-color);
+                    }
+                    .values-display {
+                        font-family: monospace;
+                        white-space: pre;
+                        padding: 1rem;
+                        background: var(--bg-card);
+                        border-radius: 4px;
+                        border: 1px solid var(--border-color);
+                        margin: 0.5rem 0;
+                        max-height: 300px;
+                        overflow-y: auto;
+                    }
+                </style>
+            """, unsafe_allow_html=True)
             
-            # Display each parameter with editable field
-            edited_data = []
+            # Display Excel-like table
+            st.markdown("""
+                <table class="excel-table">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            """, unsafe_allow_html=True)
+            
+            # Store values for copying
+            copyable_values = []
+            
             for param in parameters:
-                col1, col2, col3, col4 = st.columns([3, 3, 2, 2])
-                
                 original_value = results.get(param, '')
-                # Get the edited value from session state if it exists, otherwise use original
                 current_value = st.session_state.edited_values[st.session_state.selected_drawing].get(
                     param, 
                     original_value
                 )
                 
-                with col1:
-                    st.write(param)
+                # Add to copyable values
+                if current_value.strip():
+                    copyable_values.append(current_value)
                 
-                with col2:
-                    # Make the field editable
-                    edited_value = st.text_input(
-                        f"Edit {param}",
-                        value=current_value,
-                        key=f"edit_{param}",
-                        label_visibility="collapsed"
-                    )
-                    
-                    # Store edited value in session state if changed
-                    if edited_value != current_value:
-                        st.session_state.edited_values[st.session_state.selected_drawing][param] = edited_value
-                    
-                    # Update the value for export
-                    current_value = edited_value
-                
-                with col3:
-                    confidence = "100%" if current_value.strip() else "0%"
-                    if current_value != original_value and current_value.strip():
-                        confidence = "100% (Manual)"
-                    # Set specific confidence scores for CLOSE LENGTH and STROKE LENGTH
-                    if param == "CLOSE LENGTH" and current_value.strip():
-                        confidence = "80%"
-                    elif param == "STROKE LENGTH" and current_value.strip():
-                        confidence = "90%"
-                    st.write(confidence)
-                
-                with col4:
-                    status = "✅ Auto-filled" if original_value.strip() else "🔴 Manual Required"
-                    if current_value != original_value and current_value.strip():
-                        status = "✅ Manually Filled"
-                    st.write(status)
-                
-                # Add to export data
-                edited_data.append({
-                    "Parameter": param,
-                    "Value": current_value,
-                    "Confidence": confidence,
-                    "Status": status
-                })
+                st.markdown(f"""
+                    <tr>
+                        <td>{param}</td>
+                        <td>{current_value}</td>
+                    </tr>
+                """, unsafe_allow_html=True)
             
-            # Add save, export and back buttons
-            col1, col2, col3 = st.columns([2, 2, 2])
+            st.markdown("</tbody></table>", unsafe_allow_html=True)
+            
+            # Add copy values section
+            st.markdown("""
+                <div class="copy-values-section">
+                    <h4>Quick Copy Values</h4>
+                    <p style="color: var(--text-muted);">Values are arranged vertically for easy copying and pasting:</p>
+            """, unsafe_allow_html=True)
+            
+            # Display values in a vertical format
+            values_text = "\n".join(copyable_values)
+            st.code(values_text, language=None)
+            
+            # Add copy button
+            if st.button("📋 Copy Values to Clipboard", type="primary"):
+                st.markdown(f"""
+                    <script>
+                        navigator.clipboard.writeText(`{values_text}`);
+                    </script>
+                    """, unsafe_allow_html=True)
+                st.success("✅ Values copied to clipboard!")
+            
+            # Add save and export buttons
+            col1, col2 = st.columns([1, 1])
             
             with col1:
-                st.markdown("""
-                    <div style="display: flex; align-items: center; gap: 1rem;">
-                """, unsafe_allow_html=True)
-                if st.button("Back to All Drawings", type="secondary"):
-                    st.session_state.selected_drawing = None
-                    st.experimental_rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-            
-            with col2:
                 if st.button("Save Changes", type="primary"):
                     # Update the results with edited values
                     for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
@@ -1351,9 +1413,9 @@ def main():
                     st.session_state.all_results[st.session_state.selected_drawing] = results
                     st.success("✅ Changes saved successfully!")
             
-            with col3:
+            with col2:
                 # Create DataFrame for export
-                export_df = pd.DataFrame(edited_data)
+                export_df = pd.DataFrame([{"Parameter": p, "Value": v} for p, v in zip(parameters, copyable_values)])
                 csv = export_df.to_csv(index=False)
                 st.download_button(
                     label="Export to CSV",
@@ -1362,14 +1424,6 @@ def main():
                     mime="text/csv",
                     type="primary"
                 )
-
-            with col4:
-                # Create a clean format of just the values
-                values_text = "\n".join([
-                    f"{row['Value']}"
-                    for row in edited_data
-                    if row['Value'] and row['Value'] != "Not detected"
-                ])
 
 if __name__ == "__main__":
     main()
