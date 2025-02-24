@@ -607,7 +607,7 @@ def main():
 
         /* Buttons */
         .stButton>button {
-            background: linear-gradient(135deg, var(--secondary-color), #2980B9);
+            background: linear-gradient(135deg, var(--secondary-color), #2980B9) !important;
             color: white !important;
             border: none;
             padding: 0.75rem 1.5rem;
@@ -626,7 +626,8 @@ def main():
         .stButton>button:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
-            background: linear-gradient(135deg, #2980B9, #2573a7);
+            background: linear-gradient(135deg, #2980B9, #2573a7) !important;
+            opacity: 0.9;
         }
 
         .stButton>button:active {
@@ -635,28 +636,38 @@ def main():
         }
 
         /* Primary button */
-        .stButton.primary>button {
-            background: linear-gradient(135deg, #3498DB, #2980B9);
+        .stButton.primary>button,
+        button[data-baseweb="button"].primary {
+            background: linear-gradient(135deg, #3498DB, #2980B9) !important;
+            color: white !important;
         }
 
         /* Secondary button */
-        .stButton.secondary>button {
-            background: linear-gradient(135deg, #95A5A6, #7F8C8D);
+        .stButton.secondary>button,
+        button[data-baseweb="button"].secondary {
+            background: linear-gradient(135deg, #7F8C8D, #34495E) !important;
+            color: white !important;
         }
 
         /* Success button */
-        .stButton.success>button {
-            background: linear-gradient(135deg, #2ECC71, #27AE60);
+        .stButton.success>button,
+        button[data-baseweb="button"].success {
+            background: linear-gradient(135deg, #2ECC71, #27AE60) !important;
+            color: white !important;
         }
 
         /* Warning button */
-        .stButton.warning>button {
-            background: linear-gradient(135deg, #F1C40F, #F39C12);
+        .stButton.warning>button,
+        button[data-baseweb="button"].warning {
+            background: linear-gradient(135deg, #F1C40F, #F39C12) !important;
+            color: white !important;
         }
 
         /* Danger button */
-        .stButton.danger>button {
-            background: linear-gradient(135deg, #E74C3C, #C0392B);
+        .stButton.danger>button,
+        button[data-baseweb="button"].danger {
+            background: linear-gradient(135deg, #E74C3C, #C0392B) !important;
+            color: white !important;
         }
 
         /* Process button specific styling */
@@ -677,7 +688,7 @@ def main():
 
         /* Back button specific styling */
         .back-button {
-            background: linear-gradient(135deg, #95A5A6, #7F8C8D) !important;
+            background: linear-gradient(135deg, #7F8C8D, #34495E) !important;
             color: white !important;
             padding: 0.5rem 1rem;
             border-radius: 6px;
@@ -692,7 +703,41 @@ def main():
 
         .back-button:hover {
             transform: translateY(-2px);
-            background: linear-gradient(135deg, #7F8C8D, #6C7A7A) !important;
+            background: linear-gradient(135deg, #34495E, #2C3E50) !important;
+        }
+
+        /* Make sure text in buttons is always white */
+        .stButton>button>div,
+        .stButton>button>div>p,
+        .stButton>button>div>div,
+        .stDownloadButton>button>div {
+            color: white !important;
+        }
+
+        /* Ensure button text remains visible in both modes */
+        [data-theme="light"] .stButton>button,
+        [data-theme="dark"] .stButton>button,
+        [data-theme="light"] .stDownloadButton>button,
+        [data-theme="dark"] .stDownloadButton>button {
+            color: white !important;
+        }
+
+        [data-theme="light"] .stButton>button>div,
+        [data-theme="dark"] .stButton>button>div,
+        [data-theme="light"] .stDownloadButton>button>div,
+        [data-theme="dark"] .stDownloadButton>button>div {
+            color: white !important;
+        }
+
+        /* Additional button visibility fixes */
+        .stButton>button[kind="secondary"],
+        .stDownloadButton>button[kind="secondary"] {
+            background: linear-gradient(135deg, #7F8C8D, #34495E) !important;
+        }
+
+        .stButton>button[kind="primary"],
+        .stDownloadButton>button[kind="primary"] {
+            background: linear-gradient(135deg, #3498DB, #2980B9) !important;
         }
 
         /* Button container styling */
@@ -700,26 +745,6 @@ def main():
             display: flex;
             gap: 1rem;
             margin-top: 1rem;
-        }
-
-        /* Make sure text in buttons is always white */
-        .stButton>button>div {
-            color: white !important;
-        }
-
-        .stButton>button>div>p {
-            color: white !important;
-        }
-
-        /* Ensure button text remains visible in both modes */
-        [data-theme="light"] .stButton>button,
-        [data-theme="dark"] .stButton>button {
-            color: white !important;
-        }
-
-        [data-theme="light"] .stButton>button>div,
-        [data-theme="dark"] .stButton>button>div {
-            color: white !important;
         }
 
         /* Status badges */
