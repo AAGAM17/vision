@@ -380,16 +380,16 @@ def get_parameters_for_type(drawing_type):
     """Return the expected parameters for each drawing type"""
     if drawing_type == "CYLINDER":
         return [
-            "CYLINDER ACTION",
-            "BORE DIAMETER",
-            "ROD DIAMETER",
-            "STROKE LENGTH",
-            "CLOSE LENGTH",
-            "OPERATING PRESSURE",
-            "OPERATING TEMPERATURE",
+        "CYLINDER ACTION",
+        "BORE DIAMETER",
+        "ROD DIAMETER",
+        "STROKE LENGTH",
+        "CLOSE LENGTH",
+        "OPERATING PRESSURE",
+        "OPERATING TEMPERATURE",
             "MOUNTING",
             "ROD END",
-            "FLUID",
+        "FLUID",
             "DRAWING NUMBER"
         ]
     elif drawing_type == "VALVE":
@@ -1433,7 +1433,7 @@ def main():
                     type="primary",
                     use_container_width=True
                 )
-            
+
             with col2:
                 if st.button("Save Changes", type="primary", use_container_width=True):
                     # Collect changes for feedback
