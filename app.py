@@ -1459,23 +1459,33 @@ def main():
                     st.success("✅ Changes saved successfully!")
                 
                 # Create a clean format of just the values
-                values_text = "Parameter\tValue\tConfidence\tStatus\n" + "\n".join([
+                values_text = "\n".join([
                     f"{row['Parameter']}\t{row['Value']}\t{row['Confidence']}\t{row['Status']}"
                     for row in edited_data
                 ])
                 
                 # Add Copy Values button with JavaScript clipboard functionality
                 st.markdown(f"""
+                    <script>
+                    function copyToClipboard(text) {{
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        try {{
+                            document.execCommand('copy');
+                            const button = document.getElementById('copyButton');
+                            button.innerHTML = '✓ Copied!';
+                            setTimeout(() => button.innerHTML = 'Copy Values', 2000);
+                        }} catch (err) {{
+                            console.error('Failed to copy:', err);
+                        }}
+                        document.body.removeChild(textarea);
+                    }}
+                    </script>
                     <button
-                        onclick="
-                            const text = `{values_text}`;
-                            navigator.clipboard.writeText(text)
-                                .then(() => {{
-                                    this.innerHTML = '✓ Copied!';
-                                    setTimeout(() => this.innerHTML = 'Copy Values', 2000);
-                                }})
-                                .catch(err => console.error('Failed to copy: ', err));
-                        "
+                        id="copyButton"
+                        onclick="copyToClipboard(`Parameter\\tValue\\tConfidence\\tStatus\\n{values_text.replace('"', '\\"').replace("'", "\\'").replace('\n', '\\n')}`)"
                         style="
                             background: linear-gradient(135deg, #3498DB, #2980B9);
                             color: white;
