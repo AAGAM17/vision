@@ -1510,25 +1510,28 @@ def main():
                     if value:  # Only include non-empty values
                         values_text.append(f"{param}\t{value}")
                 
-                # Add Copy Values button with JavaScript clipboard functionality
-                st.markdown(f"""
+                # Add Copy Values button with hidden JavaScript functionality
+                st.markdown("""
                     <script>
-                    function copyToClipboard(text) {{
+                    function copyToClipboard(text) {
                         const textarea = document.createElement('textarea');
                         textarea.value = text;
                         document.body.appendChild(textarea);
                         textarea.select();
-                        try {{
+                        try {
                             document.execCommand('copy');
                             const button = document.getElementById('copyButton');
                             button.innerHTML = '✓ Copied!';
                             setTimeout(() => button.innerHTML = 'Copy Values', 2000);
-                        }} catch (err) {{
+                        } catch (err) {
                             console.error('Failed to copy:', err);
-                        }}
+                        }
                         document.body.removeChild(textarea);
-                    }}
+                    }
                     </script>
+                """, unsafe_allow_html=True)
+
+                st.markdown(f"""
                     <button
                         id="copyButton"
                         onclick="copyToClipboard(`{('\\n'.join(values_text)).replace('"', '\\"').replace("'", "\\'")}`)"
