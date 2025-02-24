@@ -279,16 +279,19 @@ def analyze_gearbox_image(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Analyze the gearbox engineering drawing and extract only the values that are clearly visible in the image.\n"
+                            "Analyze the gearbox engineering drawing and extract ONLY the values marked in RED plus the drawing number.\n"
                             "STRICT RULES:\n"
                             "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
                             "2) Extract and return data in this format:\n"
-                            "GEAR RATIO: [value]\n"
-                            "SERVICE FACTOR: [value]\n"
-                            "INPUT POWER: [value] KW\n"
-                            "SHAFT TYPES: [value]\n"
-                            "NO OF SHAFT EXTENSIONS: [value]\n"
-                            "GEARBOX ORIENTATION: [value]\n"
+                            "TYPE: [value]\n"
+                            "NUMBER OF TEETH: [value]\n"
+                            "MODULE: [value]\n"
+                            "MATERIAL: [value]\n"
+                            "PRESSURE ANGLE: [value] DEG\n"
+                            "FACE WIDTH, LENGTH: [value] MM\n"
+                            "HAND: [value]\n"
+                            "MOUNTING: [value]\n"
+                            "HELIX ANGLE: [value] DEG\n"
                             "DRAWING NUMBER: [Extract from Image]"
                         )
                     },
@@ -392,15 +395,130 @@ def get_parameters_for_type(drawing_type):
         ]
     elif drawing_type == "GEARBOX":
         return [
-            "GEAR RATIO",
-            "SERVICE FACTOR",
-            "INPUT POWER",
-            "SHAFT TYPES",
-            "NO OF SHAFT EXTENSIONS",
-            "GEARBOX ORIENTATION",
+            "TYPE",
+            "NUMBER OF TEETH",
+            "MODULE",
+            "MATERIAL",
+            "PRESSURE ANGLE",
+            "FACE WIDTH, LENGTH",
+            "HAND",
+            "MOUNTING",
+            "HELIX ANGLE",
+            "DRAWING NUMBER"
+        ]
+    elif drawing_type == "NUT":
+        return [
+            "TYPE",
+            "SIZE",
+            "PROPERTY CLASS",
+            "THREAD PITCH",
+            "COATING",
+            "NUT STANDARD",
+            "DRAWING NUMBER"
+        ]
+    elif drawing_type == "LIFTING_RAM":
+        return [
+            "HEIGHT",
+            "TOTAL STROKE",
+            "PISTON STROKE",
+            "PISTON LIFTING FORCE",
+            "WEIGHT",
+            "OIL VOLUME",
             "DRAWING NUMBER"
         ]
     return []
+
+def analyze_nut_image(image_bytes):
+    """Analyze nut drawings and extract specific parameters"""
+    base64_image = encode_image_to_base64(image_bytes)
+    
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Analyze the nut drawing and extract ONLY the values marked in RED plus the drawing number.\n"
+                            "STRICT RULES:\n"
+                            "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
+                            "2) Extract and return data in this format:\n"
+                            "TYPE: [value]\n"
+                            "SIZE: [value]\n"
+                            "PROPERTY CLASS: [value]\n"
+                            "THREAD PITCH: [value]\n"
+                            "COATING: [value]\n"
+                            "NUT STANDARD: [value]\n"
+                            "DRAWING NUMBER: [Extract from Image]"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        return process_api_response(response, analyze_nut_image, image_bytes)
+    except Exception as e:
+        return f"❌ Processing Error: {str(e)}"
+
+def analyze_lifting_ram_image(image_bytes):
+    """Analyze lifting ram drawings and extract technical specifications"""
+    base64_image = encode_image_to_base64(image_bytes)
+    
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Analyze this single-stage lifting ram technical data and extract the specifications.\n"
+                            "STRICT RULES:\n"
+                            "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
+                            "2) Extract and return data in this EXACT format with units:\n"
+                            "HEIGHT: [value] mm\n"
+                            "TOTAL STROKE: [value] mm\n"
+                            "PISTON STROKE: [value] mm\n"
+                            "PISTON LIFTING FORCE: [value] kN\n"
+                            "WEIGHT: [value] kg\n"
+                            "OIL VOLUME: [value] l\n"
+                            "DRAWING NUMBER: [Extract from Image]"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        return process_api_response(response, analyze_lifting_ram_image, image_bytes)
+    except Exception as e:
+        return f"❌ Processing Error: {str(e)}"
 
 def main():
     # Set page config
@@ -744,23 +862,23 @@ def main():
 
         /* File uploader styling */
         .stFileUploader > div {
-            padding: 2rem;
+            padding: 1rem;
             border: 2px dashed var(--secondary-color);
-            border-radius: 12px;
+            border-radius: 8px;
             background: var(--bg-light);
             transition: all 0.3s ease;
-            margin: 2rem auto;
-            max-width: 800px;
+            margin: 1rem auto;
+            max-width: 600px;
         }
         
         .stFileUploader > div:hover {
             border-color: var(--primary-color);
             background: var(--bg-card);
-            transform: translateY(-2px);
+            transform: translateY(-1px);
         }
         
         .stFileUploader [data-testid="stFileUploadDropzone"] {
-            min-height: 200px;
+            min-height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -772,41 +890,38 @@ def main():
             font-size: 0.9rem;
         }
 
-        .upload-section {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        
-        .processing-queue {
-            margin-top: 2rem;
-            padding: 1rem;
-            border-radius: 8px;
-            background: var(--bg-card);
-        }
-        
-        .queue-item {
+        /* Compact uploaded drawings section */
+        .uploaded-drawing {
             display: flex;
             align-items: center;
             gap: 1rem;
-            padding: 1rem;
+            padding: 0.75rem;
             border-bottom: 1px solid var(--border-color);
         }
-        
-        .queue-item:last-child {
-            border-bottom: none;
+
+        .uploaded-drawing img {
+            max-width: 150px;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .drawing-info {
+            flex-grow: 1;
+        }
+
+        .drawing-actions {
+            display: flex;
+            gap: 0.5rem;
         }
         </style>
     """, unsafe_allow_html=True)
 
     # Title and description with modern styling
     st.markdown("""
-        <div style="text-align: center; padding: 2rem 0;">
+        <div style="text-align: center; padding: 1rem 0;">
             <h1>JSW Engineering Drawing DataSheet Extractor</h1>
-            <div style="color: var(--text-muted); font-size: 1.1rem; margin: 1rem 0;">
+            <div style="color: var(--text-muted); font-size: 1.1rem; margin: 0.5rem 0;">
                 Automatically extract and analyze technical specifications from engineering drawings
-            </div>
-            <div class="progress-bar" style="max-width: 200px; margin: 2rem auto;">
-                <div class="progress-bar-fill" style="width: 100%;"></div>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -837,40 +952,6 @@ def main():
         if 'currently_processing' not in st.session_state:
             st.session_state.currently_processing = False
 
-        # Custom styling for file uploader
-        st.markdown("""
-            <style>
-            .stFileUploader > div {
-                padding: 2rem;
-                border: 2px dashed var(--secondary-color);
-                border-radius: 12px;
-                background: var(--bg-light);
-                transition: all 0.3s ease;
-                margin: 2rem auto;
-                max-width: 800px;
-            }
-            
-            .stFileUploader > div:hover {
-                border-color: var(--primary-color);
-                background: var(--bg-card);
-                transform: translateY(-2px);
-            }
-            
-            .stFileUploader [data-testid="stFileUploadDropzone"] {
-                min-height: 200px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: var(--text-muted);
-            }
-            
-            .stFileUploader [data-testid="stMarkdownContainer"] p {
-                color: var(--text-muted);
-                font-size: 0.9rem;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-        
         # Multi-file uploader without header
         uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
@@ -880,114 +961,117 @@ def main():
                 if uploaded_file not in st.session_state.processing_queue:
                     st.session_state.processing_queue.append(uploaded_file)
 
-            # Display uploaded files and processing options
+            # Display uploaded files in a compact layout
             st.markdown("""
-                <div class="card" style="margin-top: 2rem;">
-                    <h4 style="color: var(--primary-color); margin-bottom: 1rem;">Uploaded Drawings</h4>
-                </div>
+                <div class="card" style="margin-top: 1rem; padding: 1rem;">
+                    <h4 style="color: var(--primary-color); margin-bottom: 0.5rem;">Uploaded Drawings</h4>
+                    <div class="uploaded-drawings-container">
             """, unsafe_allow_html=True)
 
             # Process each uploaded file
             for idx, file in enumerate(uploaded_files):
-                with st.container():
-                    col1, col2 = st.columns([3, 2])
+                col1, col2 = st.columns([2, 3])
+                
+                with col1:
+                    # Show smaller preview of the image
+                    st.image(file, width=150)
+                
+                with col2:
+                    st.markdown(f"""
+                        <div style="margin-bottom: 0.5rem;">
+                            <strong style="color: var(--primary-color);">{file.name}</strong>
+                        </div>
+                    """, unsafe_allow_html=True)
                     
-                    with col1:
-                        # Show preview of the image
-                        st.image(file, caption=f"Preview: {file.name}", use_column_width=True)
-                    
-                    with col2:
-                        st.markdown(f"""
-                            <div class="card" style="padding: 1rem;">
-                                <strong style="color: var(--primary-color);">{file.name}</strong>
-                            </div>
-                        """, unsafe_allow_html=True)
-                        
-                        # Add process button
-                        if st.button(f"Process Drawing", key=f"process_{idx}"):
-                            try:
-                                # Process the file
-                                file.seek(0)
-                                image_bytes = file.read()
-                                
-                                # Step 1: Identify drawing type
-                                with st.spinner('Identifying drawing type...'):
-                                    drawing_type = identify_drawing_type(image_bytes)
-                                    
-                                    if not drawing_type or "❌" in drawing_type:
-                                        st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
-                                        continue
-                                    
-                                    # Initialize new drawing entry
-                                    new_drawing = {
-                                        'Drawing Type': drawing_type,
-                                        'Drawing No.': 'Processing..',
-                                        'Processing Status': 'Processing..',
-                                        'Extracted Fields Count': '',
-                                        'Confidence Score': ''
-                                    }
-                                    
-                                    # Add to table
-                                    st.session_state.drawings_table = pd.concat([
-                                        st.session_state.drawings_table,
-                                        pd.DataFrame([new_drawing])
-                                    ], ignore_index=True)
-                                    
-                                    # Process the drawing based on type
-                                    with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
-                                        result = None
-                                        if drawing_type == "CYLINDER":
-                                            result = analyze_cylinder_image(image_bytes)
-                                        elif drawing_type == "VALVE":
-                                            result = analyze_valve_image(image_bytes)
-                                        elif drawing_type == "GEARBOX":
-                                            result = analyze_gearbox_image(image_bytes)
-                                        
-                                        if result and "❌" not in result:
-                                            # Update with successful results
-                                            parsed_results = parse_ai_response(result)
-                                            drawing_number = (parsed_results.get('MODEL NO', '') 
-                                                            if drawing_type == "VALVE" 
-                                                            else parsed_results.get('DRAWING NUMBER', ''))
-                                            
-                                            if not drawing_number or drawing_number == 'Unknown':
-                                                drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}"
-                                            
-                                            # Store the image
-                                            file.seek(0)
-                                            st.session_state.current_image[drawing_number] = file.read()
-                                            st.session_state.all_results[drawing_number] = parsed_results
-                                            
-                                            # Update status
-                                            parameters = get_parameters_for_type(drawing_type)
-                                            non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
-                                            total_fields = len(parameters)
-                                            
-                                            new_drawing.update({
-                                                'Drawing No.': drawing_number,
-                                                'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
-                                                'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
-                                                'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
-                                            })
-                                            
-                                            st.success(f"✅ Successfully processed {file.name}")
-                                        else:
-                                            st.error(f"❌ Failed to process {file.name}")
-                                            new_drawing.update({
-                                                'Processing Status': 'Failed',
-                                                'Confidence Score': '0%',
-                                                'Extracted Fields Count': '0/0'
-                                            })
-                                        
-                                        # Update the table
-                                        st.session_state.drawings_table.iloc[-1] = new_drawing
-                                        
-                            except Exception as e:
-                                st.error(f"❌ Error processing {file.name}: {str(e)}")
+                    # Add process button
+                    if st.button(f"Process Drawing", key=f"process_{idx}"):
+                        try:
+                            # Process the file
+                            file.seek(0)
+                            image_bytes = file.read()
                             
-                            st.experimental_rerun()
-                    
-                    st.markdown("<hr>", unsafe_allow_html=True)
+                            # Step 1: Identify drawing type
+                            with st.spinner('Identifying drawing type...'):
+                                drawing_type = identify_drawing_type(image_bytes)
+                                
+                                if not drawing_type or "❌" in drawing_type:
+                                    st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
+                                    continue
+                                
+                                # Initialize new drawing entry
+                                new_drawing = {
+                                    'Drawing Type': drawing_type,
+                                    'Drawing No.': 'Processing..',
+                                    'Processing Status': 'Processing..',
+                                    'Extracted Fields Count': '',
+                                    'Confidence Score': ''
+                                }
+                                
+                                # Add to table
+                                st.session_state.drawings_table = pd.concat([
+                                    st.session_state.drawings_table,
+                                    pd.DataFrame([new_drawing])
+                                ], ignore_index=True)
+                                
+                                # Process the drawing based on type
+                                with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
+                                    result = None
+                                    if drawing_type == "CYLINDER":
+                                        result = analyze_cylinder_image(image_bytes)
+                                    elif drawing_type == "VALVE":
+                                        result = analyze_valve_image(image_bytes)
+                                    elif drawing_type == "GEARBOX":
+                                        result = analyze_gearbox_image(image_bytes)
+                                    elif drawing_type == "NUT":
+                                        result = analyze_nut_image(image_bytes)
+                                    elif drawing_type == "LIFTING_RAM":
+                                        result = analyze_lifting_ram_image(image_bytes)
+                                    
+                                    if result and "❌" not in result:
+                                        # Update with successful results
+                                        parsed_results = parse_ai_response(result)
+                                        drawing_number = (parsed_results.get('MODEL NO', '') 
+                                                        if drawing_type == "VALVE" 
+                                                        else parsed_results.get('DRAWING NUMBER', ''))
+                                        
+                                        if not drawing_number or drawing_number == 'Unknown':
+                                            drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}"
+                                        
+                                        # Store the image
+                                        file.seek(0)
+                                        st.session_state.current_image[drawing_number] = file.read()
+                                        st.session_state.all_results[drawing_number] = parsed_results
+                                        
+                                        # Update status
+                                        parameters = get_parameters_for_type(drawing_type)
+                                        non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
+                                        total_fields = len(parameters)
+                                        
+                                        new_drawing.update({
+                                            'Drawing No.': drawing_number,
+                                            'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
+                                            'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
+                                            'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
+                                        })
+                                        
+                                        st.success(f"✅ Successfully processed {file.name}")
+                                    else:
+                                        st.error(f"❌ Failed to process {file.name}")
+                                        new_drawing.update({
+                                            'Processing Status': 'Failed',
+                                            'Confidence Score': '0%',
+                                            'Extracted Fields Count': '0/0'
+                                        })
+                                    
+                                    # Update the table
+                                    st.session_state.drawings_table.iloc[-1] = new_drawing
+                                    
+                        except Exception as e:
+                            st.error(f"❌ Error processing {file.name}: {str(e)}")
+                        
+                        st.experimental_rerun()
+                
+                st.markdown("<hr>", unsafe_allow_html=True)
 
     # Display the drawings table with improved styling
     if not st.session_state.drawings_table.empty:
