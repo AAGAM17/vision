@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import requests
 from dotenv import load_dotenv
+import datetime
 
 # Load API key
 load_dotenv()
@@ -526,6 +527,45 @@ def analyze_lifting_ram_image(image_bytes):
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
+def submit_feedback_to_company(feedback_data, drawing_info, additional_notes=""):
+    """
+    Submit feedback to the company's system
+    Returns: (success: bool, message: str)
+    """
+    try:
+        # Create a comprehensive feedback package
+        feedback_package = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "drawing_info": {
+                "drawing_number": drawing_info.get("drawing_number", ""),
+                "drawing_type": drawing_info.get("drawing_type", ""),
+                "processing_date": datetime.datetime.now().strftime("%Y-%m-%d")
+            },
+            "corrections": feedback_data,
+            "additional_notes": additional_notes,
+            "user_info": {
+                "session_id": st.session_state.get("session_id", "unknown"),
+                "submission_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+        }
+        
+        # Here you would implement the actual API call to your company's feedback system
+        # For now, we'll just log it and store in session state
+        st.session_state.feedback_history.append(feedback_package)
+        
+        # In a real implementation, you would send this to your backend:
+        # response = requests.post(
+        #     "https://your-company-api.com/feedback",
+        #     json=feedback_package,
+        #     headers={"Authorization": "Bearer " + API_KEY}
+        # )
+        # if response.status_code != 200:
+        #     return False, "Failed to submit feedback to server"
+        
+        return True, "Feedback submitted successfully"
+    except Exception as e:
+        return False, f"Error submitting feedback: {str(e)}"
+
 def main():
     # Set page config
     st.set_page_config(
@@ -980,6 +1020,10 @@ def main():
         st.session_state.show_feedback_popup = False
     if 'feedback_data' not in st.session_state:
         st.session_state.feedback_data = {}
+    if 'feedback_history' not in st.session_state:
+        st.session_state.feedback_history = []
+    if 'feedback_status' not in st.session_state:
+        st.session_state.feedback_status = None
 
     # Add New Product Section
     with st.sidebar:
@@ -1511,27 +1555,120 @@ def main():
 
     # Feedback Popup
     if st.session_state.show_feedback_popup:
-        with st.form("feedback_form"):
-            st.markdown("### Submit Feedback")
-            st.markdown("The following corrections will be submitted:")
+        st.markdown("""
+            <div class="card" style="padding: 2rem; max-width: 800px; margin: 2rem auto;">
+                <h3 style="margin-bottom: 1.5rem;">Submit Feedback</h3>
+                <div style="color: var(--text-muted); margin-bottom: 2rem;">
+                    Your corrections will help improve our extraction system
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("feedback_form", clear_on_submit=True):
+            # Display corrections in a table format
+            st.markdown("#### Changes Detected")
             for param, values in st.session_state.feedback_data.items():
-                st.markdown(f"**{param}**")
-                st.markdown(f"Original: {values['original']}")
-                st.markdown(f"Corrected: {values['corrected']}")
+                st.markdown("""
+                    <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 0.5rem;">
+                            {param}
+                        </div>
+                        <div style="display: flex; gap: 2rem;">
+                            <div>
+                                <span style="color: var(--text-muted);">Original:</span>
+                                <span style="color: var(--danger-color);">{values['original'] or '(empty)'}</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-muted);">Corrected:</span>
+                                <span style="color: var(--success-color);">{values['corrected']}</span>
+                            </div>
+                        </div>
+                    </div>
+                """.format(param=param, values=values), unsafe_allow_html=True)
             
-            additional_notes = st.text_area("Additional Notes (optional)")
+            # Additional feedback options
+            st.markdown("#### Additional Information")
+            feedback_category = st.selectbox(
+                "Feedback Category",
+                ["Value Correction", "Missing Information", "Wrong Recognition", "Other"]
+            )
             
+            additional_notes = st.text_area(
+                "Additional Notes (optional)",
+                placeholder="Please provide any additional context or observations..."
+            )
+            
+            # Submission buttons
             col1, col2 = st.columns(2)
             with col1:
-                if st.form_submit_button("Submit Feedback"):
-                    # Here you would implement the actual feedback submission
-                    st.success("✅ Feedback submitted successfully!")
-                    st.session_state.show_feedback_popup = False
-                    st.session_state.feedback_data = {}
+                submit_button = st.form_submit_button(
+                    "Submit Feedback",
+                    type="primary",
+                    use_container_width=True
+                )
             with col2:
-                if st.form_submit_button("Cancel"):
+                cancel_button = st.form_submit_button(
+                    "Cancel",
+                    type="secondary",
+                    use_container_width=True
+                )
+            
+            if submit_button:
+                # Get current drawing info
+                drawing_info = {
+                    "drawing_number": st.session_state.selected_drawing,
+                    "drawing_type": st.session_state.drawings_table[
+                        st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
+                    ]['Drawing Type'].iloc[0]
+                }
+                
+                # Add category to feedback data
+                feedback_data = {
+                    "corrections": st.session_state.feedback_data,
+                    "category": feedback_category,
+                    "notes": additional_notes
+                }
+                
+                # Submit feedback
+                success, message = submit_feedback_to_company(
+                    feedback_data,
+                    drawing_info,
+                    additional_notes
+                )
+                
+                if success:
+                    st.session_state.feedback_status = {
+                        "type": "success",
+                        "message": "✅ " + message
+                    }
+                    # Clear feedback popup
                     st.session_state.show_feedback_popup = False
                     st.session_state.feedback_data = {}
+                else:
+                    st.session_state.feedback_status = {
+                        "type": "error",
+                        "message": "❌ " + message
+                    }
+                
+                st.experimental_rerun()
+            
+            elif cancel_button:
+                st.session_state.show_feedback_popup = False
+                st.session_state.feedback_data = {}
+                st.experimental_rerun()
+
+    # Display feedback status if exists
+    if st.session_state.feedback_status:
+        status_type = st.session_state.feedback_status["type"]
+        message = st.session_state.feedback_status["message"]
+        
+        if status_type == "success":
+            st.success(message)
+        else:
+            st.error(message)
+        
+        # Clear status after displaying
+        st.session_state.feedback_status = None
 
 if __name__ == "__main__":
     main()
