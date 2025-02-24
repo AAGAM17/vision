@@ -1206,17 +1206,10 @@ def main():
     if st.session_state.selected_drawing and st.session_state.selected_drawing in st.session_state.all_results:
         st.markdown(f"""
             <div class="card">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-                    <div>
-                        <h3 style="margin: 0;">Detailed View: {st.session_state.selected_drawing}</h3>
-                        <div style="color: var(--text-muted);">
-                            Review and edit extracted specifications
-                        </div>
-                    </div>
-                    <div class="tooltip" data-tooltip="Return to drawings list">
-                        <button class="back-button" onclick="window.history.back()">
-                            <i class="fas fa-arrow-left"></i> Back
-                        </button>
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="margin: 0;">Detailed View: {st.session_state.selected_drawing}</h3>
+                    <div style="color: var(--text-muted);">
+                        Review and edit extracted specifications
                     </div>
                 </div>
             </div>
