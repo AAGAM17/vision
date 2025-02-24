@@ -1383,18 +1383,34 @@ def main():
                 })
             
             # Add save, export and back buttons
-            col1, col2, col3 = st.columns([2, 2, 2])
+            st.markdown("""
+                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                    <div style="flex: 1;">
+                        <div class="button-container">
+            """, unsafe_allow_html=True)
+            
+            # Create a 2x2 grid for buttons
+            col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("""
-                    <div style="display: flex; align-items: center; gap: 1rem;">
-                """, unsafe_allow_html=True)
-                if st.button("Back to All Drawings", type="secondary"):
+                if st.button("Back to All Drawings", type="secondary", use_container_width=True):
                     st.session_state.selected_drawing = None
                     st.experimental_rerun()
+                
+                # Create DataFrame for export
+                export_df = pd.DataFrame(edited_data)
+                csv = export_df.to_csv(index=False)
+                st.download_button(
+                    label="Export to CSV",
+                    data=csv,
+                    file_name=f"{st.session_state.selected_drawing}_details.csv",
+                    mime="text/csv",
+                    type="primary",
+                    use_container_width=True
+                )
             
             with col2:
-                if st.button("Save Changes", type="primary"):
+                if st.button("Save Changes", type="primary", use_container_width=True):
                     # Collect changes for feedback
                     feedback_data = {}
                     for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
@@ -1416,20 +1432,7 @@ def main():
                         st.session_state.show_feedback_popup = True
                     
                     st.success("✅ Changes saved successfully!")
-            
-            with col3:
-                # Create DataFrame for export
-                export_df = pd.DataFrame(edited_data)
-                csv = export_df.to_csv(index=False)
-                st.download_button(
-                    label="Export to CSV",
-                    data=csv,
-                    file_name=f"{st.session_state.selected_drawing}_details.csv",
-                    mime="text/csv",
-                    type="primary"
-                )
-
-            with col4:
+                
                 # Create a clean format of just the values
                 values_text = "\n".join([
                     f"{row['Value']}"
@@ -1444,8 +1447,15 @@ def main():
                     mime="text/plain",
                     type="secondary",
                     key="copy_values_button",
-                    help="Click to copy all values to clipboard"
+                    help="Click to copy all values to clipboard",
+                    use_container_width=True
                 )
+
+            st.markdown("""
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
     # Feedback Popup
     if st.session_state.show_feedback_popup:
