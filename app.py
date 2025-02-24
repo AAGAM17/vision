@@ -1436,6 +1436,16 @@ def main():
                     for row in edited_data
                     if row['Value'] and row['Value'] != "Not detected"
                 ])
+                # Add Copy Values button
+                st.download_button(
+                    label="Copy Values",
+                    data=values_text,
+                    file_name="dummy.txt",
+                    mime="text/plain",
+                    type="secondary",
+                    key="copy_values_button",
+                    help="Click to copy all values to clipboard"
+                )
 
     # Feedback Popup
     if st.session_state.show_feedback_popup:
