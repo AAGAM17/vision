@@ -1505,26 +1505,21 @@ def main():
                 st.markdown("""
                     <div style="display:none">
                         <script>
-                        function copyToClipboard(text) {
-                            const textarea = document.createElement('textarea');
-                            textarea.value = text;
-                            document.body.appendChild(textarea);
-                            textarea.select();
-                            try {
-                                document.execCommand('copy');
+                        function copyToClipboard() {
+                            const text = `{('\\n'.join(values_text)).replace('"', '\\"').replace("'", "\\'")}`;
+                            navigator.clipboard.writeText(text).then(function() {
                                 const button = document.getElementById('copyButton');
                                 button.innerHTML = '✓ Copied!';
                                 setTimeout(() => button.innerHTML = 'Copy Values', 2000);
-                            } catch (err) {
+                            }).catch(function(err) {
                                 console.error('Failed to copy:', err);
-                            }
-                            document.body.removeChild(textarea);
+                            });
                         }
                         </script>
                     </div>
                     <button
                         id="copyButton"
-                        onclick="copyToClipboard(`{('\\n'.join(values_text)).replace('"', '\\"').replace("'", "\\'")}`)"
+                        onclick="copyToClipboard()"
                         style="
                             background: linear-gradient(135deg, #3498DB, #2980B9);
                             color: white;
