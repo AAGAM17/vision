@@ -1459,10 +1459,9 @@ def main():
                     st.success("✅ Changes saved successfully!")
                 
                 # Create a clean format of just the values
-                values_text = "\n".join([
-                    f"{row['Value']}"
+                values_text = "Parameter\tValue\tConfidence\tStatus\n" + "\n".join([
+                    f"{row['Parameter']}\t{row['Value']}\t{row['Confidence']}\t{row['Status']}"
                     for row in edited_data
-                    if row['Value'] and row['Value'] != "Not detected"
                 ])
                 # Add Copy Values button
                 st.download_button(
@@ -1470,9 +1469,9 @@ def main():
                     data=values_text,
                     file_name="dummy.txt",
                     mime="text/plain",
-                    type="secondary",
+                    type="primary",
                     key="copy_values_button",
-                    help="Click to copy all values to clipboard",
+                    help="Click to copy all values in Excel-compatible format",
                     use_container_width=True
                 )
 
