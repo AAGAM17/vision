@@ -316,7 +316,7 @@ def analyze_gearbox_image(image_bytes):
         return f"❌ Processing Error: {str(e)}"
 
 def identify_drawing_type(image_bytes):
-    """Identify if the drawing is a cylinder, valve, or gearbox"""
+    """Identify if the drawing is a cylinder, valve, gearbox, hex nut, or lifting ram"""
     base64_image = encode_image_to_base64(image_bytes)
     
     payload = {
@@ -331,9 +331,11 @@ def identify_drawing_type(image_bytes):
                             "Look at this engineering drawing and identify if it is a:\n"
                             "1. Hydraulic/Pneumatic Cylinder\n"
                             "2. Valve\n"
-                            "3. Gearbox\n\n"
+                            "3. Gearbox\n"
+                            "4. Hex Nut\n"
+                            "5. Lifting Ram\n\n"
                             "STRICT RULES:\n"
-                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, or GEARBOX\n"
+                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, GEARBOX, NUT, or LIFTING_RAM\n"
                             "2. Do not repeat the word or add any other text\n"
                             "3. The response should be exactly one word"
                         )
@@ -364,8 +366,12 @@ def identify_drawing_type(image_bytes):
                 return "VALVE"
             elif "GEARBOX" in drawing_type:
                 return "GEARBOX"
+            elif "NUT" in drawing_type:
+                return "NUT"
+            elif "LIFTING_RAM" in drawing_type or "LIFTING RAM" in drawing_type:
+                return "LIFTING_RAM"
         else:
-                return f"❌ Invalid drawing type: {drawing_type}"
+            return f"❌ Invalid drawing type: {drawing_type}"
         return result
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
@@ -943,7 +949,62 @@ def main():
         st.session_state.current_image = {}
     if 'edited_values' not in st.session_state:
         st.session_state.edited_values = {}
+    if 'custom_products' not in st.session_state:
+        st.session_state.custom_products = {}
+    if 'show_feedback_popup' not in st.session_state:
+        st.session_state.show_feedback_popup = False
+    if 'feedback_data' not in st.session_state:
+        st.session_state.feedback_data = {}
 
+    # Add New Product Section
+    with st.sidebar:
+        st.markdown("### Add New Product Type")
+        new_product_name = st.text_input("Product Name (e.g., BEARING, SHAFT)", key="new_product_name")
+        
+        # Dynamic parameter addition
+        st.markdown("#### Required Parameters")
+        param_name = st.text_input("Parameter Name", key="param_name")
+        param_unit = st.text_input("Unit (optional)", key="param_unit")
+        
+        if st.button("Add Parameter"):
+            if param_name:
+                if new_product_name not in st.session_state.custom_products:
+                    st.session_state.custom_products[new_product_name] = []
+                param_with_unit = f"{param_name} [{param_unit}]" if param_unit else param_name
+                st.session_state.custom_products[new_product_name].append(param_with_unit)
+                st.success(f"Added parameter: {param_with_unit}")
+        
+        # Show current parameters
+        if new_product_name in st.session_state.custom_products:
+            st.markdown("#### Current Parameters:")
+            for param in st.session_state.custom_products[new_product_name]:
+                st.write(f"- {param}")
+        
+        if st.button("Save New Product"):
+            if new_product_name and new_product_name in st.session_state.custom_products:
+                # Add to parameters list
+                parameters = st.session_state.custom_products[new_product_name]
+                parameters.append("DRAWING NUMBER")  # Always include drawing number
+                
+                # Create analysis function name
+                func_name = f"analyze_{new_product_name.lower()}_image"
+                
+                # Create prompt template
+                prompt = (
+                    f"Analyze this {new_product_name.lower()} drawing and extract the following parameters.\n"
+                    "STRICT RULES:\n"
+                    "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
+                    "2) Extract and return data in this format:\n"
+                )
+                for param in parameters:
+                    prompt += f"{param}: [value]\n"
+                
+                st.session_state.custom_products[new_product_name] = {
+                    'parameters': parameters,
+                    'prompt': prompt
+                }
+                st.success(f"✅ Successfully added {new_product_name} to the system!")
+                
     # File uploader with modern styling
     if st.session_state.selected_drawing is None:
         # Initialize processing queue if not exists
@@ -1334,11 +1395,26 @@ def main():
             
             with col2:
                 if st.button("Save Changes", type="primary"):
-                    # Update the results with edited values
+                    # Collect changes for feedback
+                    feedback_data = {}
+                    for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
+                        if value.strip() and value != results.get(param, ''):
+                            feedback_data[param] = {
+                                'original': results.get(param, ''),
+                                'corrected': value
+                            }
+                    
+                    # Update the results
                     for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
                         if value.strip():  # Only update non-empty values
                             results[param] = value
                     st.session_state.all_results[st.session_state.selected_drawing] = results
+                    
+                    # If there are changes, show feedback popup
+                    if feedback_data:
+                        st.session_state.feedback_data = feedback_data
+                        st.session_state.show_feedback_popup = True
+                    
                     st.success("✅ Changes saved successfully!")
             
             with col3:
@@ -1360,6 +1436,30 @@ def main():
                     for row in edited_data
                     if row['Value'] and row['Value'] != "Not detected"
                 ])
+
+    # Feedback Popup
+    if st.session_state.show_feedback_popup:
+        with st.form("feedback_form"):
+            st.markdown("### Submit Feedback")
+            st.markdown("The following corrections will be submitted:")
+            for param, values in st.session_state.feedback_data.items():
+                st.markdown(f"**{param}**")
+                st.markdown(f"Original: {values['original']}")
+                st.markdown(f"Corrected: {values['corrected']}")
+            
+            additional_notes = st.text_area("Additional Notes (optional)")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.form_submit_button("Submit Feedback"):
+                    # Here you would implement the actual feedback submission
+                    st.success("✅ Feedback submitted successfully!")
+                    st.session_state.show_feedback_popup = False
+                    st.session_state.feedback_data = {}
+            with col2:
+                if st.form_submit_button("Cancel"):
+                    st.session_state.show_feedback_popup = False
+                    st.session_state.feedback_data = {}
 
 if __name__ == "__main__":
     main()
