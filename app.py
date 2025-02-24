@@ -1503,10 +1503,12 @@ def main():
                     st.success("✅ Changes saved successfully!")
                 
                 # Create a clean format of just the values
-                values_text = "\n".join([
-                    f"{row['Parameter']}\t{row['Value']}\t{row['Confidence']}\t{row['Status']}"
-                    for row in edited_data
-                ])
+                values_text = []
+                for row in edited_data:
+                    param = row['Parameter']
+                    value = row['Value'].strip()
+                    if value:  # Only include non-empty values
+                        values_text.append(f"{param}\t{value}")
                 
                 # Add Copy Values button with JavaScript clipboard functionality
                 st.markdown(f"""
@@ -1529,7 +1531,7 @@ def main():
                     </script>
                     <button
                         id="copyButton"
-                        onclick="copyToClipboard(`Parameter\\tValue\\tConfidence\\tStatus\\n{values_text.replace('"', '\\"').replace("'", "\\'").replace('\n', '\\n')}`)"
+                        onclick="copyToClipboard(`{('\\n'.join(values_text)).replace('"', '\\"').replace("'", "\\'")}`)"
                         style="
                             background: linear-gradient(135deg, #3498DB, #2980B9);
                             color: white;
