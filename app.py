@@ -603,7 +603,7 @@ def main():
         .stButton>button {
             background: linear-gradient(135deg, var(--secondary-color), #2980B9);
             color: white !important;
-            border: none;
+            border: 2px solid var(--secondary-color) !important;
             padding: 0.75rem 1.5rem;
             border-radius: 8px;
             font-weight: 600;
@@ -621,36 +621,37 @@ def main():
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
             background: linear-gradient(135deg, #2980B9, #2573a7);
-        }
-
-        .stButton>button:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-color: #2573a7 !important;
         }
 
         /* Primary button */
         .stButton.primary>button {
             background: linear-gradient(135deg, #3498DB, #2980B9);
+            border-color: #3498DB !important;
         }
 
         /* Secondary button */
         .stButton.secondary>button {
             background: linear-gradient(135deg, #95A5A6, #7F8C8D);
+            border-color: #95A5A6 !important;
         }
 
         /* Success button */
         .stButton.success>button {
             background: linear-gradient(135deg, #2ECC71, #27AE60);
+            border-color: #2ECC71 !important;
         }
 
         /* Warning button */
         .stButton.warning>button {
             background: linear-gradient(135deg, #F1C40F, #F39C12);
+            border-color: #F1C40F !important;
         }
 
         /* Danger button */
         .stButton.danger>button {
             background: linear-gradient(135deg, #E74C3C, #C0392B);
+            border-color: #E74C3C !important;
         }
 
         /* Process button specific styling */
@@ -659,6 +660,7 @@ def main():
             color: white !important;
             font-weight: 600 !important;
             min-width: 150px;
+            border: 2px solid #3498DB !important;
         }
 
         /* View button specific styling */
@@ -667,6 +669,7 @@ def main():
             color: white !important;
             font-weight: 600 !important;
             min-width: 100px;
+            border: 2px solid #2ECC71 !important;
         }
 
         /* Back button specific styling */
@@ -675,7 +678,7 @@ def main():
             color: white !important;
             padding: 0.5rem 1rem;
             border-radius: 6px;
-            border: none;
+            border: 2px solid #95A5A6 !important;
             cursor: pointer;
             font-weight: 500;
             display: inline-flex;
@@ -687,33 +690,29 @@ def main():
         .back-button:hover {
             transform: translateY(-2px);
             background: linear-gradient(135deg, #7F8C8D, #6C7A7A) !important;
-        }
-
-        /* Button container styling */
-        .button-container {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        /* Make sure text in buttons is always white */
-        .stButton>button>div {
-            color: white !important;
-        }
-
-        .stButton>button>div>p {
-            color: white !important;
+            border-color: #7F8C8D !important;
         }
 
         /* Ensure button text remains visible in both modes */
         [data-theme="light"] .stButton>button,
         [data-theme="dark"] .stButton>button {
             color: white !important;
+            border-width: 2px !important;
+            border-style: solid !important;
         }
 
         [data-theme="light"] .stButton>button>div,
         [data-theme="dark"] .stButton>button>div {
             color: white !important;
+        }
+
+        /* Light mode specific button styles */
+        [data-theme="light"] .stButton>button {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+        }
+
+        [data-theme="light"] .stButton>button:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
         }
 
         /* Status badges */
@@ -917,41 +916,103 @@ def main():
         /* Excel-like table styling */
         .excel-table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             margin: 1rem 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
         }
+
         .excel-table th, .excel-table td {
-            padding: 8px 12px;
+            padding: 12px 15px;
             text-align: left;
             border: 1px solid var(--border-color);
+            background: var(--bg-card);
         }
+
         .excel-table th {
             background: var(--bg-light);
             font-weight: 600;
+            color: var(--text-color);
+            border-bottom: 2px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
+
         .excel-table td {
-            background: var(--bg-card);
+            color: var(--text-color);
+            font-size: 14px;
+            line-height: 1.4;
         }
+
+        .excel-table tr:nth-child(even) td {
+            background: var(--bg-light);
+        }
+
         .excel-table tr:hover td {
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        /* Parameter column styling */
+        .excel-table td:first-child {
+            font-weight: 500;
+            background: var(--bg-light);
+            border-right: 2px solid var(--border-color);
+            width: 200px;
+        }
+
+        /* Value column styling */
+        .excel-table td:last-child {
+            font-family: 'Courier New', Courier, monospace;
+            padding-left: 20px;
+        }
+
+        /* Dark mode specific table styles */
+        [data-theme="dark"] .excel-table th {
+            background: var(--bg-light);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        [data-theme="dark"] .excel-table td:first-child {
             background: var(--bg-light);
         }
-        .copy-values-section {
-            margin-top: 1rem;
-            padding: 1rem;
-            background: var(--bg-light);
+
+        [data-theme="dark"] .excel-table tr:nth-child(even) td {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        [data-theme="dark"] .excel-table tr:hover td {
+            background: rgba(52, 152, 219, 0.2);
+        }
+
+        /* Table container for better scrolling */
+        .table-wrapper {
+            max-height: 600px;
+            overflow-y: auto;
             border-radius: 8px;
             border: 1px solid var(--border-color);
+            margin: 1rem 0;
         }
-        .values-display {
-            font-family: monospace;
-            white-space: pre;
-            padding: 1rem;
-            background: var(--bg-card);
-            border-radius: 4px;
-            border: 1px solid var(--border-color);
-            margin: 0.5rem 0;
-            max-height: 300px;
-            overflow-y: auto;
+
+        /* Ensure clean borders */
+        .excel-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .excel-table td:last-child {
+            border-right: none;
+        }
+
+        .excel-table td:first-child {
+            border-left: none;
+        }
+
+        /* Add subtle transition */
+        .excel-table td {
+            transition: background-color 0.2s ease;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -1307,41 +1368,103 @@ def main():
                 <style>
                     .excel-table {
                         width: 100%;
-                        border-collapse: collapse;
+                        border-collapse: separate;
+                        border-spacing: 0;
                         margin: 1rem 0;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+                        border-radius: 8px;
+                        overflow: hidden;
                     }
+
                     .excel-table th, .excel-table td {
-                        padding: 8px 12px;
+                        padding: 12px 15px;
                         text-align: left;
                         border: 1px solid var(--border-color);
+                        background: var(--bg-card);
                     }
+
                     .excel-table th {
                         background: var(--bg-light);
                         font-weight: 600;
+                        color: var(--text-color);
+                        border-bottom: 2px solid var(--border-color);
+                        position: sticky;
+                        top: 0;
+                        z-index: 10;
                     }
+
                     .excel-table td {
-                        background: var(--bg-card);
+                        color: var(--text-color);
+                        font-size: 14px;
+                        line-height: 1.4;
                     }
+
+                    .excel-table tr:nth-child(even) td {
+                        background: var(--bg-light);
+                    }
+
                     .excel-table tr:hover td {
+                        background: rgba(52, 152, 219, 0.1);
+                    }
+
+                    /* Parameter column styling */
+                    .excel-table td:first-child {
+                        font-weight: 500;
+                        background: var(--bg-light);
+                        border-right: 2px solid var(--border-color);
+                        width: 200px;
+                    }
+
+                    /* Value column styling */
+                    .excel-table td:last-child {
+                        font-family: 'Courier New', Courier, monospace;
+                        padding-left: 20px;
+                    }
+
+                    /* Dark mode specific table styles */
+                    [data-theme="dark"] .excel-table th {
+                        background: var(--bg-light);
+                        border-bottom: 2px solid var(--border-color);
+                    }
+
+                    [data-theme="dark"] .excel-table td:first-child {
                         background: var(--bg-light);
                     }
-                    .copy-values-section {
-                        margin-top: 1rem;
-                        padding: 1rem;
-                        background: var(--bg-light);
+
+                    [data-theme="dark"] .excel-table tr:nth-child(even) td {
+                        background: rgba(255, 255, 255, 0.05);
+                    }
+
+                    [data-theme="dark"] .excel-table tr:hover td {
+                        background: rgba(52, 152, 219, 0.2);
+                    }
+
+                    /* Table container for better scrolling */
+                    .table-wrapper {
+                        max-height: 600px;
+                        overflow-y: auto;
                         border-radius: 8px;
                         border: 1px solid var(--border-color);
+                        margin: 1rem 0;
                     }
-                    .values-display {
-                        font-family: monospace;
-                        white-space: pre;
-                        padding: 1rem;
-                        background: var(--bg-card);
-                        border-radius: 4px;
-                        border: 1px solid var(--border-color);
-                        margin: 0.5rem 0;
-                        max-height: 300px;
-                        overflow-y: auto;
+
+                    /* Ensure clean borders */
+                    .excel-table tr:last-child td {
+                        border-bottom: none;
+                    }
+
+                    .excel-table td:last-child {
+                        border-right: none;
+                    }
+
+                    .excel-table td:first-child {
+                        border-left: none;
+                    }
+
+                    /* Add subtle transition */
+                    .excel-table td {
+                        transition: background-color 0.2s ease;
                     }
                 </style>
             """, unsafe_allow_html=True)
