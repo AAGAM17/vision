@@ -1463,17 +1463,35 @@ def main():
                     f"{row['Parameter']}\t{row['Value']}\t{row['Confidence']}\t{row['Status']}"
                     for row in edited_data
                 ])
-                # Add Copy Values button
-                st.download_button(
-                    label="Copy Values",
-                    data=values_text,
-                    file_name="dummy.txt",
-                    mime="text/plain",
-                    type="primary",
-                    key="copy_values_button",
-                    help="Click to copy all values in Excel-compatible format",
-                    use_container_width=True
-                )
+                
+                # Add Copy Values button with JavaScript clipboard functionality
+                st.markdown(f"""
+                    <button
+                        onclick="
+                            const text = `{values_text}`;
+                            navigator.clipboard.writeText(text)
+                                .then(() => {{
+                                    this.innerHTML = '✓ Copied!';
+                                    setTimeout(() => this.innerHTML = 'Copy Values', 2000);
+                                }})
+                                .catch(err => console.error('Failed to copy: ', err));
+                        "
+                        style="
+                            background: linear-gradient(135deg, #3498DB, #2980B9);
+                            color: white;
+                            border: none;
+                            padding: 0.75rem 1.5rem;
+                            border-radius: 8px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            width: 100%;
+                            height: 44px;
+                            transition: all 0.3s ease;
+                        "
+                    >
+                        Copy Values
+                    </button>
+                """, unsafe_allow_html=True)
 
             st.markdown("""
                         </div>
