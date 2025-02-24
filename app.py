@@ -7,143 +7,85 @@ import os
 import requests
 from dotenv import load_dotenv
 
-# Load API keys
+# Load API key
 load_dotenv()
 
-# Get all API keys from environment variables
-API_KEYS = []
-for i in range(6):  # Check for API_KEY through API_KEY5
-    key = os.getenv(f"API_KEY{i if i > 0 else ''}")
-    if key and key.strip():
-        API_KEYS.append(key.strip())
+API_KEY = os.getenv("API_KEY")
+API_KEY1 = os.getenv("API_KEY1")  # Add second API key
 
-if not API_KEYS:
+if not API_KEY and not API_KEY1:
     st.error("❌ No API keys found! Check your .env file.")
     st.stop()
 
-# Initialize API key management in session state
-if 'api_key_index' not in st.session_state:
-    st.session_state.api_key_index = 0
-if 'api_key_usage' not in st.session_state:
-    st.session_state.api_key_usage = {key: 0 for key in API_KEYS}
+# Initialize current API key in session state
+if 'current_api_key' not in st.session_state:
+    st.session_state.current_api_key = API_KEY
 
-def get_next_api_key():
-    """Get the next available API key in rotation"""
-    # Get current key index
-    current_index = st.session_state.api_key_index
-    
-    # Try all keys in rotation
-    for _ in range(len(API_KEYS)):
-        # Move to next key
-        next_index = (current_index + 1) % len(API_KEYS)
-        st.session_state.api_key_index = next_index
-        
-        # Get the key
-        api_key = API_KEYS[next_index]
-        
-        # If key hasn't been used too much, use it
-        if st.session_state.api_key_usage[api_key] < 10:  # Adjust threshold as needed
-            return api_key
-            
-        # Reset usage count if all keys are heavily used
-        if _ == len(API_KEYS) - 1:
-            st.session_state.api_key_usage = {key: 0 for key in API_KEYS}
-            return API_KEYS[0]
-    
-    return API_KEYS[0]
+def switch_api_key():
+    """Switch between available API keys"""
+    if st.session_state.current_api_key == API_KEY and API_KEY1:
+        st.session_state.current_api_key = API_KEY1
+        return True
+    elif st.session_state.current_api_key == API_KEY1 and API_KEY:
+        st.session_state.current_api_key = API_KEY
+        return True
+    return False
 
 def handle_api_response(response_json, retry_func=None, *args, **kwargs):
-    """Handle API response and rotate keys if needed"""
+    """Handle API response and switch keys if needed"""
     if 'error' in response_json:
         error = response_json.get('error', {})
         if isinstance(error, dict):
             error_code = error.get('code')
-            error_message = error.get('message', '').lower()
-            current_key = API_KEYS[st.session_state.api_key_index]
+            error_message = error.get('message', '')
             
-            # Check for quota/rate limit errors
-            if error_code == 429 or 'quota' in error_message or 'rate limit' in error_message:
-                # Increment usage count for current key
-                st.session_state.api_key_usage[current_key] += 1
-                
-                # Get next key
-                next_key = get_next_api_key()
-                if next_key != current_key:
-                    st.warning(f"Switching to next API key... (Current key: ...{current_key[-6:]})")
+            # Check for quota error
+            if error_code == 429 and 'quota' in error_message.lower():
+                if switch_api_key():
+                    st.warning("Switching to alternate API key due to quota limit...")
                     if retry_func:
                         return retry_func(*args, **kwargs)
+                    return None
                 else:
                     st.error("❌ All API keys have reached their quota limits!")
                     return None
-                    
-            # Handle other error codes
+            # Handle other specific error codes
             elif error_code == 400:
                 st.error("❌ Bad request: Please check the image format")
+                return None
             elif error_code == 401:
-                st.error(f"❌ Authentication failed for key ending in ...{current_key[-6:]}")
-                # Try next key on auth failure
-                next_key = get_next_api_key()
-                if retry_func:
-                    return retry_func(*args, **kwargs)
+                st.error("❌ Authentication failed: Please check your API key")
+                return None
             elif error_code == 403:
                 st.error("❌ Access forbidden: Please check your API permissions")
+                return None
             elif error_code == 500:
                 st.error("❌ Server error: Please try again later")
+                return None
             else:
                 st.error(f"❌ API Error: {error_message}")
-            return None
+                return None
     return response_json
 
-def process_api_request(func, *args, **kwargs):
-    """Process API request with automatic key rotation"""
-    # Get current API key
-    current_key = API_KEYS[st.session_state.api_key_index]
-    
-    # Update headers with current key
-    headers = {
-        "Authorization": f"Bearer {current_key}",
-        "Content-Type": "application/json"
-    }
-    
+def process_api_response(response, retry_func=None, *args, **kwargs):
+    """Process API response and handle errors"""
     try:
-        # Extract payload from kwargs if it exists
-        payload = kwargs.get('payload', {})
-        
-        response = requests.post(API_URL, headers=headers, json=payload)
         response_json = response.json()
         
         # Check if response is successful and contains choices
         if response.status_code == 200 and "choices" in response_json:
-            # Increment usage count for successful request
-            st.session_state.api_key_usage[current_key] += 1
             return response_json["choices"][0]["message"]["content"]
             
         # Handle API errors
-        handled_response = handle_api_response(response_json, func, *args)  # Remove kwargs here
+        handled_response = handle_api_response(response_json, retry_func, *args, **kwargs)
         if handled_response and "choices" in handled_response:
             return handled_response["choices"][0]["message"]["content"]
-            
-        # If we got an error, try with next key
-        next_key = get_next_api_key()
-        if next_key != current_key:
-            # When retrying with a new key, pass the payload in the same way
-            if 'payload' in kwargs:
-                return func(*args, payload=kwargs['payload'])
-            return func(*args)
             
         # If we get here, something went wrong
         error_msg = response_json.get('error', {}).get('message', 'Unknown error occurred')
         return f"❌ API Error: {error_msg}"
-            
+        
     except Exception as e:
-        st.error(f"❌ API Error with key ending in ...{current_key[-6:]}")
-        # Try with next key on any error
-        next_key = get_next_api_key()
-        if next_key != current_key:
-            # When retrying with a new key, pass the payload in the same way
-            if 'payload' in kwargs:
-                return func(*args, payload=kwargs['payload'])
-            return func(*args)
         return f"❌ Processing Error: {str(e)}"
 
 # OpenRouter API URL for Qwen2.5-VL-72B-Instruct
@@ -169,264 +111,261 @@ def parse_ai_response(response_text):
             results[key] = value if value else ""  # Keep blank if missing
     return results
 
-def analyze_cylinder_image(image_bytes, payload=None):
-    """Analyze cylinder drawings and extract specific parameters"""
+def analyze_cylinder_image(image_bytes):
     base64_image = encode_image_to_base64(image_bytes)
     
-    if payload is None:
-        payload = {
-            "model": "qwen/qwen2.5-vl-72b-instruct:free",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Analyze this hydraulic/pneumatic cylinder engineering drawing carefully.\n"
-                                "STRICT RULES:\n"
-                                "1) Extract ONLY values that are clearly visible. Return empty string if unclear.\n"
-                                "2) Convert all measurements to specified units.\n"
-                                "3) For CYLINDER ACTION, determine if SINGLE or DOUBLE action based on design.\n"
-                                "4) Look for text labels and dimensions in the drawing.\n"
-                                "5) For MOUNTING and ROD END: If value is not clearly visible or is '[value]', return empty string\n"
-                                "6) For FLUID: If fluid type is 'HLP', return 'HYD. OIL MINERAL' instead\n"
-                                "7) For OPERATING PRESSURE: Look specifically for 'OPERATING PRESSURE' or 'BETRIEBSDRUCK' value.\n"
-                                "   DO NOT use nominal pressure or other pressure values. Only use the operating pressure value.\n"
-                                "8) For OPERATING TEMPERATURE:\n"
-                                "   - If a single value is given (e.g., '60 DEG C'), use that value\n"
-                                "   - If a range is given (e.g., '40 TO 50 DEG C' or '-10°C +60°C'), use the maximum value only\n"
-                                "   - Always return just the number followed by 'DEG C'\n"
-                                "9) Return data in this EXACT format:\n"
-                                "CYLINDER ACTION: [SINGLE/DOUBLE]\n"
-                                "BORE DIAMETER: [value] MM\n"
-                                "ROD DIAMETER: [value] MM\n"
-                                "STROKE LENGTH: [value] MM\n"
-                                "CLOSE LENGTH: [value] MM\n"
-                                "OPERATING PRESSURE: [value from OPERATING PRESSURE/BETRIEBSDRUCK field only] BAR\n"
-                                "OPERATING TEMPERATURE: [maximum value if range, single value if no range] DEG C\n"
-                                "MOUNTING: [actual mounting type or empty string]\n"
-                                "ROD END: [actual rod end type or empty string]\n"
-                                "FLUID: [if HLP then 'HYD. OIL MINERAL', else actual fluid type]\n"
-                                "DRAWING NUMBER: [value]"
-                            )
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": base64_image
-                        }
-                    ]
-                }
-            ]
-        }
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Analyze this hydraulic/pneumatic cylinder engineering drawing carefully.\n"
+                            "STRICT RULES:\n"
+                            "1) Extract ONLY values that are clearly visible. Return empty string if unclear.\n"
+                            "2) Convert all measurements to specified units.\n"
+                            "3) For CYLINDER ACTION, determine if SINGLE or DOUBLE action based on design.\n"
+                            "4) Look for text labels and dimensions in the drawing.\n"
+                            "5) For MOUNTING and ROD END: If value is not clearly visible or is '[value]', return empty string\n"
+                            "6) For FLUID: If fluid type is 'HLP', return 'HYD. OIL MINERAL' instead\n"
+                            "7) For OPERATING PRESSURE: Look specifically for 'OPERATING PRESSURE' or 'BETRIEBSDRUCK' value.\n"
+                            "   DO NOT use nominal pressure or other pressure values. Only use the operating pressure value.\n"
+                            "8) For OPERATING TEMPERATURE:\n"
+                            "   - If a single value is given (e.g., '60 DEG C'), use that value\n"
+                            "   - If a range is given (e.g., '40 TO 50 DEG C' or '-10°C +60°C'), use the maximum value only\n"
+                            "   - Always return just the number followed by 'DEG C'\n"
+                            "9) Return data in this EXACT format:\n"
+                            "CYLINDER ACTION: [SINGLE/DOUBLE]\n"
+                            "BORE DIAMETER: [value] MM\n"
+                            "ROD DIAMETER: [value] MM\n"
+                            "STROKE LENGTH: [value] MM\n"
+                            "CLOSE LENGTH: [value] MM\n"
+                            "OPERATING PRESSURE: [value from OPERATING PRESSURE/BETRIEBSDRUCK field only] BAR\n"
+                            "OPERATING TEMPERATURE: [maximum value if range, single value if no range] DEG C\n"
+                            "MOUNTING: [actual mounting type or empty string]\n"
+                            "ROD END: [actual rod end type or empty string]\n"
+                            "FLUID: [if HLP then 'HYD. OIL MINERAL', else actual fluid type]\n"
+                            "DRAWING NUMBER: [value]"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
 
-    return process_api_request(analyze_cylinder_image, image_bytes, payload=payload)
+    headers = {
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
+        "Content-Type": "application/json"
+    }
 
-def analyze_valve_image(image_bytes, payload=None):
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        result = process_api_response(response, analyze_cylinder_image, image_bytes)
+        if "❌" not in result:
+            # Parse results
+            parsed_results = parse_ai_response(result)
+            
+            # Clean up mounting and rod end values
+            if parsed_results.get('MOUNTING', '').strip() in ['[value]', '[Value]', '[VALUES]']:
+                parsed_results['MOUNTING'] = ''
+            if parsed_results.get('ROD END', '').strip() in ['[value]', '[Value]', '[VALUES]']:
+                parsed_results['ROD END'] = ''
+            
+            # Convert HLP to HYD. OIL MINERAL if needed
+            if parsed_results.get('FLUID', '').strip().upper() == 'HLP':
+                parsed_results['FLUID'] = 'HYD. OIL MINERAL'
+            
+            # Process temperature range to get maximum value
+            temp = parsed_results.get('OPERATING TEMPERATURE', '').strip()
+            if temp:
+                # Handle different range formats
+                if 'TO' in temp.upper():
+                    # Format: "40 TO 50 DEG C"
+                    max_temp = temp.upper().split('TO')[-1].split('DEG')[0].strip()
+                elif '+' in temp:
+                    # Format: "-10°C +60°C" or similar
+                    max_temp = temp.split('+')[-1].split('DEG')[0].strip()
+                else:
+                    # Single value or other format
+                    max_temp = temp.split('DEG')[0].strip()
+                
+                # Clean up the max temperature value
+                max_temp = ''.join(filter(lambda x: x.isdigit() or x == '.', max_temp))
+                if max_temp:
+                    parsed_results['OPERATING TEMPERATURE'] = f"{max_temp} DEG C"
+                
+            return '\n'.join([f"{k}: {v}" for k, v in parsed_results.items()])
+        return result
+    except Exception as e:
+        return f"❌ Processing Error: {str(e)}"
+
+def analyze_valve_image(image_bytes):
     """Analyze valve drawings and extract specific parameters"""
     base64_image = encode_image_to_base64(image_bytes)
     
-    if payload is None:
-        payload = {
-            "model": "qwen/qwen2.5-vl-72b-instruct:free",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Analyze this valve type key diagram carefully. Look at the ordering example and specifications.\n"
-                                "STRICT RULES:\n"
-                                "1) For Model No: Extract the complete ordering example (e.g. 'SPVF M 25 A 2F 1 A12 ATEX')\n"
-                                "2) For Size: Look at the nominal size table in the diagram. Extract BOTH the size number AND unit.\n"
-                                "   - Look for values like: DN20, DN25, DN32, etc.\n"
-                                "   - Or flow rates like: 90 l/min, 450 l/min, etc.\n"
-                                "   - Always include the unit (mm, inches, l/min)\n"
-                                "   - Example format: '25 mm' or '90 l/min'\n"
-                                "3) For Pressure Rating: Look at the pressure setting range table and include full range in bar\n"
-                                "4) For Make: Look at the manufacturer name at top of drawing\n"
-                                "5) Return EXACTLY in this format:\n"
-                                "MODEL NO: [Full ordering example]\n"
-                                "SIZE OF VALVE: [Size with unit (e.g., 25 mm or 90 l/min)]\n"
-                                "PRESSURE RATING: [Pressure range] BAR\n"
-                                "MAKE: [Manufacturer name]\n\n"
-                                "Example outputs:\n"
-                                "MODEL NO: SPVF M 25 A 2F 1 A12 ATEX\n"
-                                "SIZE OF VALVE: 25 mm (DN25)\n"
-                                "PRESSURE RATING: 4...12 BAR\n"
-                                "MAKE: KRACHT\n\n"
-                                "or\n\n"
-                                "MODEL NO: SPVF M 80 A 2F 1 A12\n"
-                                "SIZE OF VALVE: 800 l/min\n"
-                                "PRESSURE RATING: 10...20 BAR\n"
-                                "MAKE: KRACHT"
-                            )
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": base64_image
-                        }
-                    ]
-                }
-            ]
-        }
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Analyze this valve type key diagram carefully. Look at the ordering example and specifications.\n"
+                            "STRICT RULES:\n"
+                            "1) For Model No: Extract the complete ordering example (e.g. 'SPVF M 25 A 2F 1 A12 ATEX')\n"
+                            "2) For Size: Look at the nominal size table in the diagram. Extract BOTH the size number AND unit.\n"
+                            "   - Look for values like: DN20, DN25, DN32, etc.\n"
+                            "   - Or flow rates like: 90 l/min, 450 l/min, etc.\n"
+                            "   - Always include the unit (mm, inches, l/min)\n"
+                            "   - Example format: '25 mm' or '90 l/min'\n"
+                            "3) For Pressure Rating: Look at the pressure setting range table and include full range in bar\n"
+                            "4) For Make: Look at the manufacturer name at top of drawing\n"
+                            "5) Return EXACTLY in this format:\n"
+                            "MODEL NO: [Full ordering example]\n"
+                            "SIZE OF VALVE: [Size with unit (e.g., 25 mm or 90 l/min)]\n"
+                            "PRESSURE RATING: [Pressure range] BAR\n"
+                            "MAKE: [Manufacturer name]\n\n"
+                            "Example outputs:\n"
+                            "MODEL NO: SPVF M 25 A 2F 1 A12 ATEX\n"
+                            "SIZE OF VALVE: 25 mm (DN25)\n"
+                            "PRESSURE RATING: 4...12 BAR\n"
+                            "MAKE: KRACHT\n\n"
+                            "or\n\n"
+                            "MODEL NO: SPVF M 80 A 2F 1 A12\n"
+                            "SIZE OF VALVE: 800 l/min\n"
+                            "PRESSURE RATING: 10...20 BAR\n"
+                            "MAKE: KRACHT"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
 
-    return process_api_request(analyze_valve_image, image_bytes, payload=payload)
+    headers = {
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
+        "Content-Type": "application/json"
+    }
 
-def analyze_gearbox_image(image_bytes, payload=None):
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        return process_api_response(response, analyze_valve_image, image_bytes)
+    except Exception as e:
+        return f"❌ Processing Error: {str(e)}"
+
+def analyze_gearbox_image(image_bytes):
     """Analyze gearbox drawings and extract specific parameters"""
     base64_image = encode_image_to_base64(image_bytes)
     
-    if payload is None:
-        payload = {
-            "model": "qwen/qwen2.5-vl-72b-instruct:free",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Analyze the gearbox engineering drawing and extract only the values that are clearly visible in the image.\n"
-                                "STRICT RULES:\n"
-                                "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
-                                "2) Extract and return data in this EXACT format:\n"
-                                "TYPE: [value]\n"
-                                "NUMBER OF TEETH: [value]\n"
-                                "MODULE: [value]\n"
-                                "MATERIAL: [value]\n"
-                                "PRESSURE ANGLE: [value] DEG\n"
-                                "FACE WIDTH, LENGTH: [value] MM\n"
-                                "HAND: [value]\n"
-                                "MOUNTING: [value]\n"
-                                "HELIX ANGLE: [value] DEG\n"
-                                "DRAWING NUMBER: [Extract from Image]"
-                            )
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": base64_image
-                        }
-                    ]
-                }
-            ]
-        }
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Analyze the gearbox engineering drawing and extract only the values that are clearly visible in the image.\n"
+                            "STRICT RULES:\n"
+                            "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
+                            "2) Extract and return data in this format:\n"
+                            "GEAR RATIO: [value]\n"
+                            "SERVICE FACTOR: [value]\n"
+                            "INPUT POWER: [value] KW\n"
+                            "SHAFT TYPES: [value]\n"
+                            "NO OF SHAFT EXTENSIONS: [value]\n"
+                            "GEARBOX ORIENTATION: [value]\n"
+                            "DRAWING NUMBER: [Extract from Image]"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
 
-    return process_api_request(analyze_gearbox_image, image_bytes, payload=payload)
+    headers = {
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
+        "Content-Type": "application/json"
+    }
 
-def analyze_nut_image(image_bytes, payload=None):
-    """Analyze nut drawings and extract specific parameters"""
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        return process_api_response(response, analyze_gearbox_image, image_bytes)
+    except Exception as e:
+        return f"❌ Processing Error: {str(e)}"
+
+def identify_drawing_type(image_bytes):
+    """Identify if the drawing is a cylinder, valve, or gearbox"""
     base64_image = encode_image_to_base64(image_bytes)
     
-    if payload is None:
-        payload = {
-            "model": "qwen/qwen2.5-vl-72b-instruct:free",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Analyze this nut engineering drawing and extract only the values that are clearly visible in the image.\n"
-                                "STRICT RULES:\n"
-                                "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
-                                "2) Extract and return data in this EXACT format:\n"
-                                "TYPE: [value]\n"
-                                "SIZE: [value]\n"
-                                "PROPERTY CLASS: [value]\n"
-                                "THREAD PITCH: [value]\n"
-                                "COATING: [value]\n"
-                                "NUT STANDARD: [value]\n"
-                                "DRAWING NUMBER: [Extract from Image]"
-                            )
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": base64_image
-                        }
-                    ]
-                }
-            ]
-        }
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Look at this engineering drawing and identify if it is a:\n"
+                            "1. Hydraulic/Pneumatic Cylinder\n"
+                            "2. Valve\n"
+                            "3. Gearbox\n\n"
+                            "STRICT RULES:\n"
+                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, or GEARBOX\n"
+                            "2. Do not repeat the word or add any other text\n"
+                            "3. The response should be exactly one word"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
 
-    return process_api_request(analyze_nut_image, image_bytes, payload=payload)
+    headers = {
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
+        "Content-Type": "application/json"
+    }
 
-def analyze_lifting_ram_image(image_bytes, payload=None):
-    """Analyze lifting ram drawings and extract specific parameters"""
-    base64_image = encode_image_to_base64(image_bytes)
-    
-    if payload is None:
-        payload = {
-            "model": "qwen/qwen2.5-vl-72b-instruct:free",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Analyze this lifting ram engineering drawing and extract only the values that are clearly visible in the image.\n"
-                                "STRICT RULES:\n"
-                                "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
-                                "2) Extract and return data in this EXACT format:\n"
-                                "HEIGHT: [value] MM\n"
-                                "TOTAL STROKE: [value] MM\n"
-                                "PISTON STROKE: [value] MM\n"
-                                "PISTON LIFTING FORCE: [value] KN\n"
-                                "WEIGHT: [value] KG\n"
-                                "OIL VOLUME: [value] L\n"
-                                "DRAWING NUMBER: [Extract from Image]"
-                            )
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": base64_image
-                        }
-                    ]
-                }
-            ]
-        }
-
-    return process_api_request(analyze_lifting_ram_image, image_bytes, payload=payload)
-
-def identify_drawing_type(image_bytes, payload=None):
-    """Identify if the drawing is a cylinder, valve, gearbox, nut, or lifting ram"""
-    base64_image = encode_image_to_base64(image_bytes)
-    
-    if payload is None:
-        payload = {
-            "model": "qwen/qwen2.5-vl-72b-instruct:free",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Look at this engineering drawing and identify if it is a:\n"
-                                "1. Hydraulic/Pneumatic Cylinder\n"
-                                "2. Valve\n"
-                                "3. Gearbox\n"
-                                "4. Nut\n"
-                                "5. Lifting Ram\n\n"
-                                "STRICT RULES:\n"
-                                "1. ONLY respond with one of these exact words: CYLINDER, VALVE, GEARBOX, NUT, or LIFTING RAM\n"
-                                "2. Do not repeat the word or add any other text\n"
-                                "3. The response should be exactly one word or two words for 'LIFTING RAM'"
-                            )
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": base64_image
-                        }
-                    ]
-                }
-            ]
-        }
-
-    return process_api_request(identify_drawing_type, image_bytes, payload=payload)
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        result = process_api_response(response, identify_drawing_type, image_bytes)
+        
+        if "❌" not in result:
+            drawing_type = result.strip().upper()
+            if "CYLINDER" in drawing_type:
+                return "CYLINDER"
+            elif "VALVE" in drawing_type:
+                return "VALVE"
+            elif "GEARBOX" in drawing_type:
+                return "GEARBOX"
+        else:
+                return f"❌ Invalid drawing type: {drawing_type}"
+        return result
+    except Exception as e:
+        return f"❌ Processing Error: {str(e)}"
 
 def get_parameters_for_type(drawing_type):
     """Return the expected parameters for each drawing type"""
@@ -453,35 +392,12 @@ def get_parameters_for_type(drawing_type):
         ]
     elif drawing_type == "GEARBOX":
         return [
-            "TYPE",
-            "NUMBER OF TEETH",
-            "MODULE",
-            "MATERIAL",
-            "PRESSURE ANGLE",
-            "FACE WIDTH, LENGTH",
-            "HAND",
-            "MOUNTING",
-            "HELIX ANGLE",
-            "DRAWING NUMBER"
-        ]
-    elif drawing_type == "NUT":
-        return [
-            "TYPE",
-            "SIZE",
-            "PROPERTY CLASS",
-            "THREAD PITCH",
-            "COATING",
-            "NUT STANDARD",
-            "DRAWING NUMBER"
-        ]
-    elif drawing_type == "LIFTING RAM":
-        return [
-            "HEIGHT",
-            "TOTAL STROKE",
-            "PISTON STROKE",
-            "PISTON LIFTING FORCE",
-            "WEIGHT",
-            "OIL VOLUME",
+            "GEAR RATIO",
+            "SERVICE FACTOR",
+            "INPUT POWER",
+            "SHAFT TYPES",
+            "NO OF SHAFT EXTENSIONS",
+            "GEARBOX ORIENTATION",
             "DRAWING NUMBER"
         ]
     return []
@@ -1026,10 +942,6 @@ def main():
                                             result = analyze_valve_image(image_bytes)
                                         elif drawing_type == "GEARBOX":
                                             result = analyze_gearbox_image(image_bytes)
-                                        elif drawing_type == "NUT":
-                                            result = analyze_nut_image(image_bytes)
-                                        elif drawing_type == "LIFTING RAM":
-                                            result = analyze_lifting_ram_image(image_bytes)
                                         
                                         if result and "❌" not in result:
                                             # Update with successful results
@@ -1282,6 +1194,7 @@ def main():
             
             # Add save, export and back buttons
             col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
+            
             with col1:
                 if st.button("Back to All Drawings"):
                     st.session_state.selected_drawing = None
@@ -1294,19 +1207,6 @@ def main():
                         if value.strip():  # Only update non-empty values
                             results[param] = value
                     st.session_state.all_results[st.session_state.selected_drawing] = results
-                    
-                    # Update the main table statistics
-                    idx = st.session_state.drawings_table[
-                        st.session_state.drawings_table['Drawing No.'] == st.session_state.selected_drawing
-                    ].index[0]
-                    
-                    non_empty_fields = sum(1 for k in parameters if results.get(k, '').strip())
-                    total_fields = len(parameters)
-                    
-                    st.session_state.drawings_table.loc[idx, 'Extracted Fields Count'] = f"{non_empty_fields}/{total_fields}"
-                    st.session_state.drawings_table.loc[idx, 'Confidence Score'] = f"{(non_empty_fields / total_fields * 100):.0f}%"
-                    st.session_state.drawings_table.loc[idx, 'Processing Status'] = 'Completed' if non_empty_fields == total_fields else 'Needs Review!'
-                    
                     st.success("✅ Changes saved successfully!")
             
             with col3:
