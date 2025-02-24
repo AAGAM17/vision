@@ -1331,15 +1331,19 @@ def main():
                 })
             
             # Add save, export and back buttons
-            col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
+            col1, col2, col3 = st.columns([2, 2, 2])
             
             with col1:
-                if st.button("Back to All Drawings"):
+                st.markdown("""
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                """, unsafe_allow_html=True)
+                if st.button("Back to All Drawings", type="secondary"):
                     st.session_state.selected_drawing = None
                     st.experimental_rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
             
             with col2:
-                if st.button("Save Changes"):
+                if st.button("Save Changes", type="primary"):
                     # Update the results with edited values
                     for param, value in st.session_state.edited_values[st.session_state.selected_drawing].items():
                         if value.strip():  # Only update non-empty values
@@ -1355,7 +1359,8 @@ def main():
                     label="Export to CSV",
                     data=csv,
                     file_name=f"{st.session_state.selected_drawing}_details.csv",
-                    mime="text/csv"
+                    mime="text/csv",
+                    type="primary"
                 )
 
             with col4:
