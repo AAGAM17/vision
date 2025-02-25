@@ -1554,56 +1554,43 @@ def main():
             </div>
         """, unsafe_allow_html=True)
 
-        with st.form("feedback_form", clear_on_submit=True):
-            # Display corrections in a table format
-            st.markdown("#### Changes Detected")
-            for param, values in st.session_state.feedback_data.items():
-                st.markdown("""
-                    <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                        <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 0.5rem;">
-                            {param}
+        # Display corrections in a table format
+        st.markdown("#### Changes Detected")
+        for param, values in st.session_state.feedback_data.items():
+            st.markdown(f"""
+                <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 0.5rem;">
+                        {param}
+                    </div>
+                    <div style="display: flex; gap: 2rem;">
+                        <div>
+                            <span style="color: var(--text-muted);">Original:</span>
+                            <span style="color: var(--danger-color);">{values['original'] or '(empty)'}</span>
                         </div>
-                        <div style="display: flex; gap: 2rem;">
-                            <div>
-                                <span style="color: var(--text-muted);">Original:</span>
-                                <span style="color: var(--danger-color);">{values['original'] or '(empty)'}</span>
-                            </div>
-                            <div>
-                                <span style="color: var(--text-muted);">Corrected:</span>
-                                <span style="color: var(--success-color);">{values['corrected']}</span>
-                            </div>
+                        <div>
+                            <span style="color: var(--text-muted);">Corrected:</span>
+                            <span style="color: var(--success-color);">{values['corrected']}</span>
                         </div>
                     </div>
-                """.format(param=param, values=values), unsafe_allow_html=True)
-            
-            # Additional feedback options
-            st.markdown("#### Additional Information")
-            feedback_category = st.selectbox(
-                "Feedback Category",
-                ["Value Correction", "Missing Information", "Wrong Recognition", "Other"]
-            )
-            
-            additional_notes = st.text_area(
-                "Additional Notes (optional)",
-                placeholder="Please provide any additional context or observations..."
-            )
-            
-            # Submission buttons
-            col1, col2 = st.columns(2)
-            with col1:
-                submit_button = st.form_submit_button(
-                    "Submit Feedback",
-                    type="primary",
-                    use_container_width=True
-                )
-            with col2:
-                cancel_button = st.form_submit_button(
-                    "Cancel",
-                    type="secondary",
-                    use_container_width=True
-                )
-            
-            if submit_button:
+                </div>
+            """, unsafe_allow_html=True)
+        
+        # Additional feedback options
+        st.markdown("#### Additional Information")
+        feedback_category = st.selectbox(
+            "Feedback Category",
+            ["Value Correction", "Missing Information", "Wrong Recognition", "Other"]
+        )
+        
+        additional_notes = st.text_area(
+            "Additional Notes (optional)",
+            placeholder="Please provide any additional context or observations..."
+        )
+        
+        # Submission buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Submit Feedback", type="primary", use_container_width=True):
                 # Get current drawing info
                 drawing_info = {
                     "drawing_number": st.session_state.selected_drawing,
@@ -1641,8 +1628,9 @@ def main():
                     }
                 
                 st.experimental_rerun()
-            
-            elif cancel_button:
+        
+        with col2:
+            if st.button("Cancel", type="secondary", use_container_width=True):
                 st.session_state.show_feedback_popup = False
                 st.session_state.feedback_data = {}
                 st.experimental_rerun()
