@@ -641,7 +641,6 @@ def convert_pdf_using_pdf2image_alternative(pdf_bytes):
 def convert_pdf_to_images(pdf_bytes):
     """Convert PDF bytes to a list of PIL Images using multiple methods"""
     # Try PyMuPDF first (no external dependencies)
-    st.info("Attempting PDF conversion with PyMuPDF...")
     result = convert_pdf_using_pymupdf(pdf_bytes)
     if result:
         return result
