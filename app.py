@@ -11,6 +11,8 @@ from pdf2image import convert_from_bytes
 import tempfile
 import sys
 import subprocess
+import fitz  # PyMuPDF
+from pdf2image.exceptions import PDFPageCountError
 
 def check_poppler_installed():
     """Check if poppler is installed on the system"""
@@ -583,55 +585,113 @@ def submit_feedback_to_company(feedback_data, drawing_info, additional_notes="")
     except Exception as e:
         return False, f"Error submitting feedback: {str(e)}"
 
-def convert_pdf_to_images(pdf_bytes):
-    """Convert PDF bytes to a list of PIL Images"""
-    if not check_poppler_installed():
-        error_message = """
-        ❌ Poppler is not installed. Please install it first:
-        
-        • On macOS: brew install poppler
-        • On Ubuntu/Debian: sudo apt-get install poppler-utils
-        • On Windows: Download from https://blog.alivate.com.au/poppler-windows/ and add to PATH
-        
-        After installing, please restart the application.
-        """
-        st.error(error_message)
+def convert_pdf_using_pymupdf(pdf_bytes):
+    """Convert PDF to images using PyMuPDF (faster and no external dependencies)"""
+    try:
+        # Load PDF from bytes
+        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        image_bytes_list = []
+
+        # Convert each page to an image
+        for page_num in range(pdf_document.page_count):
+            page = pdf_document[page_num]
+            
+            # Get the page as a PNG image with higher resolution
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better quality
+            img_data = pix.tobytes("png")
+            
+            # Convert PNG to JPEG for consistency and smaller size
+            img = Image.open(io.BytesIO(img_data))
+            img_byte_arr = io.BytesIO()
+            img = img.convert('RGB')  # Convert to RGB mode for JPEG
+            img.save(img_byte_arr, format='JPEG', quality=85, optimize=True)
+            image_bytes_list.append(img_byte_arr.getvalue())
+
+        pdf_document.close()
+        return image_bytes_list
+    except Exception as e:
+        st.error(f"Error converting PDF with PyMuPDF: {str(e)}")
         return None
 
+def convert_pdf_using_pdf2image_alternative(pdf_bytes):
+    """Try alternative PDF to image conversion using pdf2image with different settings"""
     try:
-        # Create temporary file to store PDF
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_pdf:
-            temp_pdf.write(pdf_bytes)
-            temp_pdf.seek(0)
-            
-            try:
-                # Convert PDF to images with higher DPI for better quality
-                images = convert_from_bytes(pdf_bytes, dpi=200, fmt='jpeg', 
-                                         grayscale=False, size=None,
-                                         thread_count=2)
-                
-                # Convert PIL images to bytes
-                image_bytes_list = []
-                for i, image in enumerate(images):
-                    img_byte_arr = io.BytesIO()
-                    # Optimize JPEG quality
-                    image.save(img_byte_arr, format='JPEG', quality=85, optimize=True)
-                    image_bytes_list.append(img_byte_arr.getvalue())
-                
-                return image_bytes_list
-            except Exception as e:
-                st.error(f"Error converting PDF pages: {str(e)}")
-                return None
+        # Try using pdf2image without poppler first
+        images = convert_from_bytes(
+            pdf_bytes,
+            dpi=200,
+            fmt='jpeg',
+            grayscale=False,
+            size=None,
+            use_pdftocairo=False  # Try without pdftocairo first
+        )
+        
+        # Convert PIL images to bytes
+        image_bytes_list = []
+        for image in images:
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format='JPEG', quality=85, optimize=True)
+            image_bytes_list.append(img_byte_arr.getvalue())
+        
+        return image_bytes_list
     except Exception as e:
-        st.error(f"Error handling PDF file: {str(e)}")
+        st.error(f"Error with alternative PDF conversion: {str(e)}")
         return None
-    finally:
-        # Clean up temporary file
-        if 'temp_pdf' in locals():
-            try:
-                os.unlink(temp_pdf.name)
-            except Exception:
-                pass
+
+def convert_pdf_to_images(pdf_bytes):
+    """Convert PDF bytes to a list of PIL Images using multiple methods"""
+    # Try PyMuPDF first (no external dependencies)
+    st.info("Attempting PDF conversion with PyMuPDF...")
+    result = convert_pdf_using_pymupdf(pdf_bytes)
+    if result:
+        return result
+
+    # Try pdf2image with alternative settings
+    st.info("Attempting PDF conversion with alternative method...")
+    result = convert_pdf_using_pdf2image_alternative(pdf_bytes)
+    if result:
+        return result
+
+    # Finally, try poppler if available
+    if check_poppler_installed():
+        st.info("Attempting PDF conversion with Poppler...")
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_pdf:
+                temp_pdf.write(pdf_bytes)
+                temp_pdf.seek(0)
+                
+                try:
+                    images = convert_from_bytes(pdf_bytes, dpi=200, fmt='jpeg', 
+                                             grayscale=False, size=None,
+                                             thread_count=2)
+                    
+                    image_bytes_list = []
+                    for image in images:
+                        img_byte_arr = io.BytesIO()
+                        image.save(img_byte_arr, format='JPEG', quality=85, optimize=True)
+                        image_bytes_list.append(img_byte_arr.getvalue())
+                    
+                    return image_bytes_list
+                except Exception as e:
+                    st.error(f"Error converting PDF with Poppler: {str(e)}")
+                    return None
+                finally:
+                    try:
+                        os.unlink(temp_pdf.name)
+                    except Exception:
+                        pass
+        except Exception as e:
+            st.error(f"Error handling PDF file: {str(e)}")
+            return None
+    else:
+        st.warning("""
+        Note: For better PDF conversion quality, you can install Poppler:
+        • On macOS: brew install poppler
+        • On Ubuntu/Debian: sudo apt-get install poppler-utils
+        • On Windows: Download from https://blog.alivate.com.au/poppler-windows/
+        """)
+    
+    return None
 
 def process_uploaded_file(uploaded_file):
     """Process uploaded file whether it's an image or PDF"""
