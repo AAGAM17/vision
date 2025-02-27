@@ -7,6 +7,23 @@ import os
 import requests
 from dotenv import load_dotenv
 import datetime
+from pdf2image import convert_from_bytes
+import tempfile
+import sys
+import subprocess
+
+def check_poppler_installed():
+    """Check if poppler is installed on the system"""
+    try:
+        if sys.platform.startswith('win'):
+            # On Windows, check if path contains poppler
+            return any('poppler' in path.lower() for path in os.environ.get('PATH', '').split(os.pathsep))
+        else:
+            # On Unix-like systems, try to run pdftoppm
+            subprocess.run(['pdftoppm', '-v'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return True
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return False
 
 # Load API key
 load_dotenv()
@@ -566,6 +583,84 @@ def submit_feedback_to_company(feedback_data, drawing_info, additional_notes="")
     except Exception as e:
         return False, f"Error submitting feedback: {str(e)}"
 
+def convert_pdf_to_images(pdf_bytes):
+    """Convert PDF bytes to a list of PIL Images"""
+    if not check_poppler_installed():
+        error_message = """
+        ❌ Poppler is not installed. Please install it first:
+        
+        • On macOS: brew install poppler
+        • On Ubuntu/Debian: sudo apt-get install poppler-utils
+        • On Windows: Download from https://blog.alivate.com.au/poppler-windows/ and add to PATH
+        
+        After installing, please restart the application.
+        """
+        st.error(error_message)
+        return None
+
+    try:
+        # Create temporary file to store PDF
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_pdf:
+            temp_pdf.write(pdf_bytes)
+            temp_pdf.seek(0)
+            
+            try:
+                # Convert PDF to images with higher DPI for better quality
+                images = convert_from_bytes(pdf_bytes, dpi=200, fmt='jpeg', 
+                                         grayscale=False, size=None,
+                                         thread_count=2)
+                
+                # Convert PIL images to bytes
+                image_bytes_list = []
+                for i, image in enumerate(images):
+                    img_byte_arr = io.BytesIO()
+                    # Optimize JPEG quality
+                    image.save(img_byte_arr, format='JPEG', quality=85, optimize=True)
+                    image_bytes_list.append(img_byte_arr.getvalue())
+                
+                return image_bytes_list
+            except Exception as e:
+                st.error(f"Error converting PDF pages: {str(e)}")
+                return None
+    except Exception as e:
+        st.error(f"Error handling PDF file: {str(e)}")
+        return None
+    finally:
+        # Clean up temporary file
+        if 'temp_pdf' in locals():
+            try:
+                os.unlink(temp_pdf.name)
+            except Exception:
+                pass
+
+def process_uploaded_file(uploaded_file):
+    """Process uploaded file whether it's an image or PDF"""
+    try:
+        if uploaded_file.type == "application/pdf":
+            # Show processing message
+            with st.spinner('Converting PDF to images...'):
+                # Convert PDF to images
+                pdf_bytes = uploaded_file.read()
+                image_bytes_list = convert_pdf_to_images(pdf_bytes)
+                if not image_bytes_list:
+                    st.error("Failed to convert PDF to images. Please check if the PDF is valid.")
+                    return None
+                st.success(f"Successfully converted PDF to {len(image_bytes_list)} images")
+                return image_bytes_list
+        else:
+            # Handle direct image upload
+            try:
+                # Verify it's a valid image
+                image = Image.open(io.BytesIO(uploaded_file.read()))
+                uploaded_file.seek(0)  # Reset file pointer
+                return [uploaded_file.read()]
+            except Exception as e:
+                st.error(f"Invalid image file: {str(e)}")
+                return None
+    except Exception as e:
+        st.error(f"Error processing file: {str(e)}")
+        return None
+
 def main():
     # Set page config
     st.set_page_config(
@@ -1074,56 +1169,57 @@ def main():
                 }
                 st.success(f"✅ Successfully added {new_product_name} to the system!")
                 
-    # File uploader with modern styling
-    if st.session_state.selected_drawing is None:
-        # Initialize processing queue if not exists
-        if 'processing_queue' not in st.session_state:
-            st.session_state.processing_queue = []
-        if 'currently_processing' not in st.session_state:
-            st.session_state.currently_processing = False
+    # Multi-file uploader with support for PDF and images
+    uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'pdf'], accept_multiple_files=True)
 
-        # Multi-file uploader without header
-        uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+    if uploaded_files:
+        # Process each uploaded file
+        for uploaded_file in uploaded_files:
+            if uploaded_file not in st.session_state.processing_queue:
+                st.session_state.processing_queue.append(uploaded_file)
 
-        if uploaded_files:
-            # Add new files to processing queue
-            for uploaded_file in uploaded_files:
-                if uploaded_file not in st.session_state.processing_queue:
-                    st.session_state.processing_queue.append(uploaded_file)
+        # Display uploaded files in a compact layout
+        st.markdown("""
+            <div class="card" style="margin-top: 1rem; padding: 1rem;">
+                <h4 style="color: var(--primary-color); margin-bottom: 0.5rem;">Uploaded Drawings</h4>
+                <div class="uploaded-drawings-container">
+        """, unsafe_allow_html=True)
 
-            # Display uploaded files in a compact layout
-            st.markdown("""
-                <div class="card" style="margin-top: 1rem; padding: 1rem;">
-                    <h4 style="color: var(--primary-color); margin-bottom: 0.5rem;">Uploaded Drawings</h4>
-                    <div class="uploaded-drawings-container">
-            """, unsafe_allow_html=True)
-
-            # Process each uploaded file
-            for idx, file in enumerate(uploaded_files):
-                col1, col2 = st.columns([2, 3])
-                
-                with col1:
-                    # Show smaller preview of the image
+        # Process each uploaded file
+        for idx, file in enumerate(uploaded_files):
+            col1, col2 = st.columns([2, 3])
+            
+            with col1:
+                # Show preview of the file
+                if file.type == "application/pdf":
+                    st.markdown(f"📄 PDF: {file.name}")
+                else:
                     st.image(file, width=150)
+            
+            with col2:
+                # Show file info and processing status
+                st.markdown(f"""
+                    <div style="margin-bottom: 0.5rem;">
+                        <strong style="color: var(--primary-color);">{file.name}</strong>
+                        <span style="color: var(--text-muted);">({file.type})</span>
+                    </div>
+                """, unsafe_allow_html=True)
                 
-                with col2:
-                    # Show file info and processing status
-                    st.markdown(f"""
-                        <div style="margin-bottom: 0.5rem;">
-                            <strong style="color: var(--primary-color);">{file.name}</strong>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    col2_1, col2_2 = st.columns([3, 2])
-                    
-                    with col2_1:
-                        # Add process button
-                        if st.button(f"Process Drawing", key=f"process_{idx}"):
-                            try:
-                                # Process the file
-                                file.seek(0)
-                                image_bytes = file.read()
-                                
+                col2_1, col2_2 = st.columns([3, 2])
+                
+                with col2_1:
+                    # Add process button
+                    if st.button(f"Process Drawing", key=f"process_{idx}"):
+                        try:
+                            # Process the file
+                            processed_images = process_uploaded_file(file)
+                            
+                            if not processed_images:
+                                st.error(f"Failed to process {file.name}")
+                                continue
+                            
+                            # Process each image from the file
+                            for img_idx, image_bytes in enumerate(processed_images):
                                 # Step 1: Identify drawing type
                                 with st.spinner('Identifying drawing type...'):
                                     drawing_type = identify_drawing_type(image_bytes)
@@ -1133,9 +1229,10 @@ def main():
                                         continue
                                     
                                     # Initialize new drawing entry
+                                    suffix = f"_page_{img_idx + 1}" if len(processed_images) > 1 else ""
                                     new_drawing = {
                                         'Drawing Type': drawing_type,
-                                        'Drawing No.': 'Processing..',
+                                        'Drawing No.': f"Processing{suffix}",
                                         'Processing Status': 'Processing..',
                                         'Extracted Fields Count': '',
                                         'Confidence Score': ''
@@ -1169,11 +1266,10 @@ def main():
                                                             else parsed_results.get('DRAWING NUMBER', ''))
                                             
                                             if not drawing_number or drawing_number == 'Unknown':
-                                                drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}"
+                                                drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}{suffix}"
                                             
                                             # Store the image
-                                            file.seek(0)
-                                            st.session_state.current_image[drawing_number] = file.read()
+                                            st.session_state.current_image[drawing_number] = image_bytes
                                             st.session_state.all_results[drawing_number] = parsed_results
                                             
                                             # Update status
@@ -1188,7 +1284,7 @@ def main():
                                                 'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
                                             })
                                             
-                                            st.success(f"✅ Successfully processed {file.name}")
+                                            st.success(f"✅ Successfully processed page {img_idx + 1} of {file.name}")
                                             
                                             # Add view button after successful processing
                                             st.markdown(f"""
@@ -1199,12 +1295,12 @@ def main():
                                                 </div>
                                             """, unsafe_allow_html=True)
                                             
-                                            if st.button("View Results", key=f"view_results_{idx}"):
+                                            if st.button("View Results", key=f"view_results_{idx}_{img_idx}"):
                                                 st.session_state.selected_drawing = drawing_number
                                                 st.experimental_rerun()
                                             
                                         else:
-                                            st.error(f"❌ Failed to process {file.name}")
+                                            st.error(f"❌ Failed to process page {img_idx + 1} of {file.name}")
                                             new_drawing.update({
                                                 'Processing Status': 'Failed',
                                                 'Confidence Score': '0%',
@@ -1222,38 +1318,9 @@ def main():
                                         
                                         # Update the table
                                         st.session_state.drawings_table.iloc[-1] = new_drawing
-                            except Exception as e:
-                                st.error(f"❌ Error processing {file.name}: {str(e)}")
-                            st.experimental_rerun()
-                    
-                    with col2_2:
-                        # Show processing status if already processed
-                        if not st.session_state.drawings_table.empty:
-                            matching_drawing = st.session_state.drawings_table[
-                                st.session_state.drawings_table['Drawing No.'].str.contains(file.name, na=False)
-                            ]
-                            if not matching_drawing.empty:
-                                status = matching_drawing.iloc[0]['Processing Status']
-                                status_styles = {
-                                    'Processing..': ('var(--secondary-color)', 'rgba(52, 152, 219, 0.1)'),
-                                    'Completed': ('var(--success-color)', 'rgba(39, 174, 96, 0.1)'),
-                                    'Needs Review!': ('var(--warning-color)', 'rgba(243, 156, 18, 0.1)'),
-                                    'Failed': ('var(--danger-color)', 'rgba(231, 76, 60, 0.1)')
-                                }
-                                color, bg = status_styles.get(status, ('black', 'rgba(0, 0, 0, 0.1)'))
-                                st.markdown(f"""
-                                    <div class="status-badge" style="background: {bg}; color: {color};">
-                                        {status}
-                                    </div>
-                                """, unsafe_allow_html=True)
-                                
-                                if status in ['Completed', 'Needs Review!']:
-                                    drawing_number = matching_drawing.iloc[0]['Drawing No.']
-                                    if st.button("View Results", key=f"view_{drawing_number}"):
-                                        st.session_state.selected_drawing = drawing_number
-                                        st.experimental_rerun()
-                
-                st.markdown("<hr>", unsafe_allow_html=True)
+                        except Exception as e:
+                            st.error(f"❌ Error processing {file.name}: {str(e)}")
+                        st.experimental_rerun()
 
     # Display the drawings table with improved styling
     if not st.session_state.drawings_table.empty:
