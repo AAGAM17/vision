@@ -669,6 +669,38 @@ def main():
         initial_sidebar_state="collapsed"
     )
 
+    # Initialize all session state variables
+    if 'drawings_table' not in st.session_state:
+        st.session_state.drawings_table = pd.DataFrame(columns=[
+            'Drawing Type',
+            'Drawing No.',
+            'Processing Status',
+            'Extracted Fields Count',
+            'Confidence Score'
+        ])
+    if 'all_results' not in st.session_state:
+        st.session_state.all_results = {}
+    if 'selected_drawing' not in st.session_state:
+        st.session_state.selected_drawing = None
+    if 'current_image' not in st.session_state:
+        st.session_state.current_image = {}
+    if 'edited_values' not in st.session_state:
+        st.session_state.edited_values = {}
+    if 'custom_products' not in st.session_state:
+        st.session_state.custom_products = {}
+    if 'show_feedback_popup' not in st.session_state:
+        st.session_state.show_feedback_popup = False
+    if 'feedback_data' not in st.session_state:
+        st.session_state.feedback_data = {}
+    if 'feedback_history' not in st.session_state:
+        st.session_state.feedback_history = []
+    if 'feedback_status' not in st.session_state:
+        st.session_state.feedback_status = None
+    if 'processing_queue' not in st.session_state:
+        st.session_state.processing_queue = []
+    if 'currently_processing' not in st.session_state:
+        st.session_state.currently_processing = False
+
     # Custom CSS for better UI with dark mode support
     st.markdown("""
         <style>
@@ -1092,34 +1124,6 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # Initialize session state
-    if 'drawings_table' not in st.session_state:
-        st.session_state.drawings_table = pd.DataFrame(columns=[
-            'Drawing Type',
-            'Drawing No.',
-            'Processing Status',
-            'Extracted Fields Count',
-            'Confidence Score'
-        ])
-    if 'all_results' not in st.session_state:
-        st.session_state.all_results = {}
-    if 'selected_drawing' not in st.session_state:
-        st.session_state.selected_drawing = None
-    if 'current_image' not in st.session_state:
-        st.session_state.current_image = {}
-    if 'edited_values' not in st.session_state:
-        st.session_state.edited_values = {}
-    if 'custom_products' not in st.session_state:
-        st.session_state.custom_products = {}
-    if 'show_feedback_popup' not in st.session_state:
-        st.session_state.show_feedback_popup = False
-    if 'feedback_data' not in st.session_state:
-        st.session_state.feedback_data = {}
-    if 'feedback_history' not in st.session_state:
-        st.session_state.feedback_history = []
-    if 'feedback_status' not in st.session_state:
-        st.session_state.feedback_status = None
-
     # Add New Product Section
     with st.sidebar:
         st.markdown("### Add New Product Type")
@@ -1175,7 +1179,12 @@ def main():
     if uploaded_files:
         # Process each uploaded file
         for uploaded_file in uploaded_files:
-            if uploaded_file not in st.session_state.processing_queue:
+            # Create a unique identifier for the file
+            file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+            
+            # Check if file is already in queue
+            existing_files = [f"{f.name}_{f.size}" for f in st.session_state.processing_queue]
+            if file_id not in existing_files:
                 st.session_state.processing_queue.append(uploaded_file)
 
         # Display uploaded files in a compact layout
