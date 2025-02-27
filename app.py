@@ -758,8 +758,17 @@ def main():
         st.session_state.feedback_status = None
     if 'processing_queue' not in st.session_state:
         st.session_state.processing_queue = []
-    if 'currently_processing' not in st.session_state:
-        st.session_state.currently_processing = False
+    if 'needs_rerun' not in st.session_state:
+        st.session_state.needs_rerun = False
+
+    # Function to handle state changes that require a rerun
+    def set_rerun():
+        st.session_state.needs_rerun = True
+
+    # Function to handle drawing selection
+    def select_drawing(drawing_number):
+        st.session_state.selected_drawing = drawing_number
+        set_rerun()
 
     # Custom CSS for better UI with dark mode support
     st.markdown("""
@@ -1365,8 +1374,7 @@ def main():
                                             """, unsafe_allow_html=True)
                                             
                                             if st.button("View Results", key=f"view_results_{idx}_{img_idx}"):
-                                                st.session_state.selected_drawing = drawing_number
-                                                st.experimental_rerun()
+                                                select_drawing(drawing_number)
                                             
                                         else:
                                             st.error(f"❌ Failed to process page {img_idx + 1} of {file.name}")
@@ -1389,7 +1397,7 @@ def main():
                                         st.session_state.drawings_table.iloc[-1] = new_drawing
                         except Exception as e:
                             st.error(f"❌ Error processing {file.name}: {str(e)}")
-                        st.experimental_rerun()
+                        set_rerun()
 
     # Display the drawings table with improved styling
     if not st.session_state.drawings_table.empty:
@@ -1453,8 +1461,7 @@ def main():
                     """, unsafe_allow_html=True)
                 with col6:
                     if st.button('View', key=f'view_{index}'):
-                        st.session_state.selected_drawing = row['Drawing No.']
-                        st.experimental_rerun()
+                        select_drawing(row['Drawing No.'])
                 
                 st.markdown("</div></div>", unsafe_allow_html=True)
         
@@ -1592,7 +1599,7 @@ def main():
             with col1:
                 if st.button("Back to All Drawings", type="secondary", use_container_width=True):
                     st.session_state.selected_drawing = None
-                    st.experimental_rerun()
+                    set_rerun()
                 
                 # Create DataFrame for export
                 export_df = pd.DataFrame(edited_data)
@@ -1763,13 +1770,13 @@ def main():
                         "message": "❌ " + message
                     }
                 
-                st.experimental_rerun()
+                set_rerun()
         
         with col2:
             if st.button("Cancel", type="secondary", use_container_width=True):
                 st.session_state.show_feedback_popup = False
                 st.session_state.feedback_data = {}
-                st.experimental_rerun()
+                set_rerun()
 
     # Display feedback status if exists
     if st.session_state.feedback_status:
@@ -1783,6 +1790,11 @@ def main():
         
         # Clear status after displaying
         st.session_state.feedback_status = None
+
+    # Check if we need to rerun at the end of the main function
+    if st.session_state.needs_rerun:
+        st.session_state.needs_rerun = False
+        st.rerun()
 
 if __name__ == "__main__":
     main()
