@@ -335,13 +335,9 @@ def analyze_gearbox_image(image_bytes):
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
-def identify_drawing_type(image_bytes):
-    """Identify if the drawing is a cylinder, valve, gearbox, hex nut, lifting ram, or custom product type"""
+def identify_standard_type(image_bytes):
+    """Identify if the drawing is a standard type (cylinder, valve, gearbox, hex nut, or lifting ram)"""
     base64_image = encode_image_to_base64(image_bytes)
-    
-    # First, get all custom product types
-    custom_types = list(st.session_state.custom_products.keys())
-    custom_types_str = ", ".join(custom_types) if custom_types else "no custom types"
     
     payload = {
         "model": "qwen/qwen2.5-vl-72b-instruct:free",
@@ -352,20 +348,18 @@ def identify_drawing_type(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Look at this engineering drawing and identify its type.\n"
+                            "Look at this engineering drawing and identify if it matches any of these standard types:\n"
                             "STRICT RULES:\n"
-                            "1. First check if it matches any of these standard types:\n"
+                            "1. Check ONLY for these standard types:\n"
                             "   - Hydraulic/Pneumatic Cylinder\n"
                             "   - Valve\n"
                             "   - Gearbox\n"
                             "   - Hex Nut\n"
                             "   - Lifting Ram\n\n"
-                            f"2. If it doesn't match any standard type, check if it matches these custom types: {custom_types_str}\n\n"
-                            "3. ONLY respond with one of these exact words:\n"
-                            "   - For standard types: CYLINDER, VALVE, GEARBOX, NUT, or LIFTING_RAM\n"
-                            "   - For custom types, use the exact custom type name\n"
-                            "4. If it doesn't match any type, respond with UNKNOWN\n"
-                            "5. The response should be exactly one word"
+                            "2. ONLY respond with one of these exact words:\n"
+                            "   CYLINDER, VALVE, GEARBOX, NUT, or LIFTING_RAM\n"
+                            "3. If it doesn't match any type, respond with UNKNOWN\n"
+                            "4. The response should be exactly one word"
                         )
                     },
                     {
@@ -384,122 +378,14 @@ def identify_drawing_type(image_bytes):
 
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
-        result = process_api_response(response, identify_drawing_type, image_bytes)
+        result = process_api_response(response, identify_standard_type, image_bytes)
         
         if "❌" not in result:
             drawing_type = result.strip().upper()
-            # Check for standard types
             if drawing_type in ["CYLINDER", "VALVE", "GEARBOX", "NUT", "LIFTING_RAM"]:
                 return drawing_type
-            # Check for custom types
-            elif drawing_type in [t.upper() for t in custom_types]:
-                return drawing_type
-            else:
-                return "❌ Unknown drawing type"
+            return "❌ Unknown drawing type"
         return result
-    except Exception as e:
-        return f"❌ Processing Error: {str(e)}"
-
-def create_optimized_prompt(product_type, image_bytes):
-    """Create an optimized prompt for the custom product type using Qwen's vision ability"""
-    base64_image = encode_image_to_base64(image_bytes)
-    
-    # Get the parameters for this product type
-    product_params = st.session_state.custom_products[product_type]['parameters']
-    params_str = "\n".join([f"- {param}" for param in product_params])
-    
-    payload = {
-        "model": "qwen/qwen2.5-vl-72b-instruct:free",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            f"You are looking at a {product_type} engineering drawing. "
-                            "Create an optimized prompt to extract these parameters accurately:\n\n"
-                            f"{params_str}\n\n"
-                            "Based on what you see in the drawing, create a detailed prompt that will help extract "
-                            "these parameters accurately. Include specific instructions about:\n"
-                            "1. Where to look for each parameter in the drawing\n"
-                            "2. How to handle different formats or notations\n"
-                            "3. Any specific conversion rules needed\n"
-                            "4. How to validate the extracted values\n\n"
-                            "Return the prompt in this format:\n"
-                            "PROMPT: [Your detailed prompt here]"
-                        )
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": base64_image
-                    }
-                ]
-            }
-        ]
-    }
-
-    headers = {
-        "Authorization": f"Bearer {st.session_state.current_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        result = process_api_response(response)
-        if result and "❌" not in result:
-            # Extract the prompt part
-            if "PROMPT:" in result:
-                return result.split("PROMPT:")[1].strip()
-            return result
-        return None
-    except Exception as e:
-        st.error(f"Error creating optimized prompt: {str(e)}")
-        return None
-
-def analyze_custom_product(image_bytes, product_type):
-    """Analyze custom product drawings using an optimized prompt"""
-    base64_image = encode_image_to_base64(image_bytes)
-    
-    # Get or create optimized prompt
-    if 'optimized_prompt' not in st.session_state.custom_products[product_type]:
-        with st.spinner("Creating optimized prompt for analysis..."):
-            optimized_prompt = create_optimized_prompt(product_type, image_bytes)
-            if optimized_prompt:
-                st.session_state.custom_products[product_type]['optimized_prompt'] = optimized_prompt
-            else:
-                # Fallback to basic prompt if optimization fails
-                optimized_prompt = st.session_state.custom_products[product_type]['prompt']
-    else:
-        optimized_prompt = st.session_state.custom_products[product_type]['optimized_prompt']
-    
-    payload = {
-        "model": "qwen/qwen2.5-vl-72b-instruct:free",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": optimized_prompt
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": base64_image
-                    }
-                ]
-            }
-        ]
-    }
-
-    headers = {
-        "Authorization": f"Bearer {st.session_state.current_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        return process_api_response(response, analyze_custom_product, image_bytes, product_type)
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
@@ -748,6 +634,7 @@ def convert_pdf_using_pdf2image_alternative(pdf_bytes):
 def convert_pdf_to_images(pdf_bytes):
     """Convert PDF bytes to a list of PIL Images using multiple methods"""
     # Try PyMuPDF first (no external dependencies)
+    st.info("Attempting PDF conversion with PyMuPDF...")
     result = convert_pdf_using_pymupdf(pdf_bytes)
     if result:
         return result
@@ -864,17 +751,8 @@ def main():
         st.session_state.feedback_status = None
     if 'processing_queue' not in st.session_state:
         st.session_state.processing_queue = []
-    if 'needs_rerun' not in st.session_state:
-        st.session_state.needs_rerun = False
-
-    # Function to handle state changes that require a rerun
-    def set_rerun():
-        st.session_state.needs_rerun = True
-
-    # Function to handle drawing selection
-    def select_drawing(drawing_number):
-        st.session_state.selected_drawing = drawing_number
-        set_rerun()
+    if 'currently_processing' not in st.session_state:
+        st.session_state.currently_processing = False
 
     # Custom CSS for better UI with dark mode support
     st.markdown("""
@@ -1299,98 +1177,6 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # Information Guide Section
-    with st.expander("ℹ️ Information Guide - What can be extracted?"):
-        st.markdown("### Supported Drawing Types and Extractable Information")
-        
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "🔧 Cylinder", 
-            "🔵 Valve", 
-            "⚙️ Gearbox", 
-            "🔩 Hex Nut", 
-            "🏗️ Lifting Ram"
-        ])
-        
-        with tab1:
-            st.markdown("#### 🔧 Hydraulic/Pneumatic Cylinder")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Cylinder Action (Single/Double)
-                - Bore Diameter (mm)
-                - Rod Diameter (mm)
-                - Stroke Length (mm)
-                - Close Length (mm)
-                - Operating Pressure (bar)
-                - Operating Temperature (°C)
-                - Mounting Type
-                - Rod End Type
-                - Fluid Type
-                - Drawing Number
-            """)
-        
-        with tab2:
-            st.markdown("#### 🔵 Valve")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Model Number
-                - Size of Valve (mm/l/min)
-                - Pressure Rating (bar)
-                - Manufacturer
-            """)
-        
-        with tab3:
-            st.markdown("#### ⚙️ Gearbox")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Type
-                - Number of Teeth
-                - Module
-                - Material
-                - Pressure Angle (deg)
-                - Face Width/Length (mm)
-                - Hand
-                - Mounting
-                - Helix Angle (deg)
-                - Drawing Number
-            """)
-        
-        with tab4:
-            st.markdown("#### 🔩 Hex Nut")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Type
-                - Size
-                - Property Class
-                - Thread Pitch
-                - Coating
-                - Nut Standard
-                - Drawing Number
-            """)
-        
-        with tab5:
-            st.markdown("#### 🏗️ Lifting Ram")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Height (mm)
-                - Total Stroke (mm)
-                - Piston Stroke (mm)
-                - Piston Lifting Force (kN)
-                - Weight (kg)
-                - Oil Volume (l)
-                - Drawing Number
-            """)
-
-        st.divider()
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### 🔄 Custom Product Types")
-            st.markdown("""
-                You can add custom product types with their own parameters using the sidebar menu.
-                All measurements are automatically converted to the specified units.
-            """)
-        with col2:
-            st.info("💡 To add a custom product type:\n1. Open the sidebar\n2. Enter product name\n3. Add required parameters\n4. Save the new product type")
-
     # Add New Product Section
     with st.sidebar:
         st.markdown("### Add New Product Type")
@@ -1444,160 +1230,149 @@ def main():
     uploaded_files = st.file_uploader("", type=['png', 'jpg', 'jpeg', 'pdf'], accept_multiple_files=True)
 
     if uploaded_files:
+        # Add drawing type selector
+        drawing_type_category = st.radio(
+            "Select Drawing Type Category:",
+            ["Standard Products", "Custom Products"],
+            help="Choose 'Standard Products' for Cylinder, Valve, Gearbox, etc. Choose 'Custom Products' for your custom defined products."
+        )
+
         # Process each uploaded file
-        for uploaded_file in uploaded_files:
+        for idx, file in enumerate(uploaded_files):
             # Create a unique identifier for the file
-            file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+            file_id = f"{file.name}_{file.size}"
             
             # Check if file is already in queue
             existing_files = [f"{f.name}_{f.size}" for f in st.session_state.processing_queue]
             if file_id not in existing_files:
-                st.session_state.processing_queue.append(uploaded_file)
+                st.session_state.processing_queue.append(file)
 
-            # Display uploaded files in a compact layout
-            st.markdown("""
-                <div class="card" style="margin-top: 1rem; padding: 1rem;">
-                    <h4 style="color: var(--primary-color); margin-bottom: 0.5rem;">Uploaded Drawings</h4>
-                    <div class="uploaded-drawings-container">
-            """, unsafe_allow_html=True)
-
-            # Process each uploaded file
-            for idx, file in enumerate(uploaded_files):
-                col1, col2 = st.columns([2, 3])
-                
-                with col1:
-                    # Show preview of the file
-                    if file.type == "application/pdf":
-                        st.markdown(f"PDF: {file.name}")
-                    else:
-                        st.image(file, width=150)
-                
-                with col2:
-                    # Show file info and processing status
-                    st.markdown(f"""
-                        <div style="margin-bottom: 0.5rem;">
-                            <strong style="color: var(--primary-color);">{file.name}</strong>
+            col1, col2 = st.columns([2, 3])
+            
+            with col1:
+                # Show preview of the file
+                if file.type == "application/pdf":
+                    st.markdown(f"📄 PDF: {file.name}")
+                else:
+                    st.image(file, width=150)
+            
+            with col2:
+                # Show file info and processing status
+                st.markdown(f"""
+                    <div style="margin-bottom: 0.5rem;">
+                        <strong style="color: var(--primary-color);">{file.name}</strong>
                         <span style="color: var(--text-muted);">({file.type})</span>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    col2_1, col2_2 = st.columns([3, 2])
-                    
-                    with col2_1:
-                        # Add process button
-                        if st.button(f"Process Drawing", key=f"process_{idx}"):
-                            try:
-                                # Process the file
-                                processed_images = process_uploaded_file(file)
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button(f"Process Drawing", key=f"process_{idx}"):
+                    try:
+                        # Process the file
+                        processed_images = process_uploaded_file(file)
+                        
+                        if not processed_images:
+                            st.error(f"Failed to process {file.name}")
+                            continue
+                        
+                        # Process each image from the file
+                        for img_idx, image_bytes in enumerate(processed_images):
+                            # Step 1: Identify drawing type based on selected category
+                            with st.spinner('Identifying drawing type...'):
+                                if drawing_type_category == "Custom Products":
+                                    # If custom products selected, show dropdown to choose type
+                                    custom_types = list(st.session_state.custom_products.keys())
+                                    if not custom_types:
+                                        st.error("No custom products defined. Please add custom products first.")
+                                        continue
+                                    selected_type = st.selectbox(
+                                        "Select Custom Product Type:",
+                                        custom_types,
+                                        key=f"custom_type_{idx}_{img_idx}"
+                                    )
+                                    drawing_type = selected_type.upper()
+                                else:
+                                    # For standard products, use automatic identification
+                                    drawing_type = identify_standard_type(image_bytes)
                                 
-                                if not processed_images:
-                                    st.error(f"Failed to process {file.name}")
+                                if not drawing_type or "❌" in drawing_type:
+                                    st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
                                     continue
                                 
-                                # Process each image from the file
-                                for img_idx, image_bytes in enumerate(processed_images):
-                                    # Step 1: Identify drawing type
-                                    with st.spinner('Identifying drawing type...'):
-                                        drawing_type = identify_drawing_type(image_bytes)
+                                # Initialize new drawing entry
+                                suffix = f"_page_{img_idx + 1}" if len(processed_images) > 1 else ""
+                                new_drawing = {
+                                    'Drawing Type': drawing_type,
+                                    'Drawing No.': f"Processing{suffix}",
+                                    'Processing Status': 'Processing..',
+                                    'Extracted Fields Count': '',
+                                    'Confidence Score': ''
+                                }
+                                
+                                # Add to table
+                                st.session_state.drawings_table = pd.concat([
+                                    st.session_state.drawings_table,
+                                    pd.DataFrame([new_drawing])
+                                ], ignore_index=True)
+                                
+                                # Process the drawing based on type
+                                with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
+                                    result = None
+                                    if drawing_type == "CYLINDER":
+                                        result = analyze_cylinder_image(image_bytes)
+                                    elif drawing_type == "VALVE":
+                                        result = analyze_valve_image(image_bytes)
+                                    elif drawing_type == "GEARBOX":
+                                        result = analyze_gearbox_image(image_bytes)
+                                    elif drawing_type == "NUT":
+                                        result = analyze_nut_image(image_bytes)
+                                    elif drawing_type == "LIFTING_RAM":
+                                        result = analyze_lifting_ram_image(image_bytes)
+                                    elif drawing_type in st.session_state.custom_products:
+                                        result = analyze_custom_product(image_bytes, drawing_type)
+                                    
+                                    if result and "❌" not in result:
+                                        # Update with successful results
+                                        parsed_results = parse_ai_response(result)
+                                        drawing_number = (parsed_results.get('MODEL NO', '') 
+                                                        if drawing_type == "VALVE" 
+                                                        else parsed_results.get('DRAWING NUMBER', ''))
                                         
-                                        if not drawing_type or "❌" in drawing_type:
-                                            st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
-                                            continue
+                                        if not drawing_number or drawing_number == 'Unknown':
+                                            drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}{suffix}"
                                         
-                                        # Initialize new drawing entry
-                                        suffix = f"_page_{img_idx + 1}" if len(processed_images) > 1 else ""
-                                        new_drawing = {
-                                            'Drawing Type': drawing_type,
-                                            'Drawing No.': f"Processing{suffix}",
-                                            'Processing Status': 'Processing..',
-                                            'Extracted Fields Count': '',
-                                            'Confidence Score': ''
-                                        }
+                                        # Store the image
+                                        st.session_state.current_image[drawing_number] = image_bytes
+                                        st.session_state.all_results[drawing_number] = parsed_results
                                         
-                                        # Add to table
-                                        st.session_state.drawings_table = pd.concat([
-                                            st.session_state.drawings_table,
-                                            pd.DataFrame([new_drawing])
-                                        ], ignore_index=True)
+                                        # Update status
+                                        parameters = get_parameters_for_type(drawing_type)
+                                        non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
+                                        total_fields = len(parameters)
                                         
-                                        # Process the drawing based on type
-                                        with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
-                                            result = None
-                                            if drawing_type == "CYLINDER":
-                                                result = analyze_cylinder_image(image_bytes)
-                                            elif drawing_type == "VALVE":
-                                                result = analyze_valve_image(image_bytes)
-                                            elif drawing_type == "GEARBOX":
-                                                result = analyze_gearbox_image(image_bytes)
-                                            elif drawing_type == "NUT":
-                                                result = analyze_nut_image(image_bytes)
-                                            elif drawing_type == "LIFTING_RAM":
-                                                result = analyze_lifting_ram_image(image_bytes)
-                                            elif drawing_type in st.session_state.custom_products:
-                                                result = analyze_custom_product(image_bytes, drawing_type)
-                                            
-                                            if result and "❌" not in result:
-                                                # Update with successful results
-                                                parsed_results = parse_ai_response(result)
-                                                drawing_number = (parsed_results.get('MODEL NO', '') 
-                                                                if drawing_type == "VALVE" 
-                                                                else parsed_results.get('DRAWING NUMBER', ''))
-                                                
-                                                if not drawing_number or drawing_number == 'Unknown':
-                                                    drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}{suffix}"
-                                                
-                                                # Store the image
-                                                st.session_state.current_image[drawing_number] = image_bytes
-                                                st.session_state.all_results[drawing_number] = parsed_results
-                                                
-                                                # Update status
-                                                parameters = get_parameters_for_type(drawing_type)
-                                                non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
-                                                total_fields = len(parameters)
-                                                
-                                                new_drawing.update({
-                                                    'Drawing No.': drawing_number,
-                                                    'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
-                                                    'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
-                                                    'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
-                                                })
-                                                
-                                                st.success(f"✅ Successfully processed page {img_idx + 1} of {file.name}")
-                                                
-                                                # Add view button after successful processing
-                                                st.markdown(f"""
-                                                    <div style="margin-top: 0.5rem;">
-                                                        <div class="status-badge" style="background: rgba(39, 174, 96, 0.1); color: var(--success-color);">
-                                                            Processed Successfully
-                                                        </div>
-                                                    </div>
-                                                """, unsafe_allow_html=True)
-                                                
-                                                if st.button("View Results", key=f"view_results_{idx}_{img_idx}"):
-                                                    select_drawing(drawing_number)
-                                                
-                                            else:
-                                                st.error(f"❌ Failed to process page {img_idx + 1} of {file.name}")
-                                                new_drawing.update({
-                                                    'Processing Status': 'Failed',
-                                                    'Confidence Score': '0%',
-                                                    'Extracted Fields Count': '0/0'
-                                                })
-                                                
-                                                # Show error status
-                                                st.markdown(f"""
-                                                    <div style="margin-top: 0.5rem;">
-                                                        <div class="status-badge" style="background: rgba(231, 76, 60, 0.1); color: var(--danger-color);">
-                                                            Processing Failed
-                                                        </div>
-                                                    </div>
-                                                """, unsafe_allow_html=True)
-                                            
-                                            # Update the table
-                                            st.session_state.drawings_table.iloc[-1] = new_drawing
-                            except Exception as e:
-                                st.error(f"❌ Error processing {file.name}: {str(e)}")
-                        set_rerun()
+                                        new_drawing.update({
+                                            'Drawing No.': drawing_number,
+                                            'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
+                                            'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
+                                            'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
+                                        })
+                                        
+                                        st.success(f"✅ Successfully processed page {img_idx + 1} of {file.name}")
+                                        
+                                        if st.button("View Results", key=f"view_results_{idx}_{img_idx}"):
+                                            select_drawing(drawing_number)
+                                    else:
+                                        st.error(f"❌ Failed to process page {img_idx + 1} of {file.name}")
+                                        new_drawing.update({
+                                            'Processing Status': 'Failed',
+                                            'Confidence Score': '0%',
+                                            'Extracted Fields Count': '0/0'
+                                        })
+                                    
+                                    # Update the table
+                                    st.session_state.drawings_table.iloc[-1] = new_drawing
+                    except Exception as e:
+                        st.error(f"❌ Error processing {file.name}: {str(e)}")
+                    set_rerun()
 
     # Display the drawings table with improved styling
     if not st.session_state.drawings_table.empty:
@@ -1661,7 +1436,8 @@ def main():
                     """, unsafe_allow_html=True)
                 with col6:
                     if st.button('View', key=f'view_{index}'):
-                        select_drawing(row['Drawing No.'])
+                        st.session_state.selected_drawing = row['Drawing No.']
+                        st.experimental_rerun()
                 
                 st.markdown("</div></div>", unsafe_allow_html=True)
         
@@ -1799,7 +1575,7 @@ def main():
             with col1:
                 if st.button("Back to All Drawings", type="secondary", use_container_width=True):
                     st.session_state.selected_drawing = None
-                    set_rerun()
+                    st.experimental_rerun()
                 
                 # Create DataFrame for export
                 export_df = pd.DataFrame(edited_data)
@@ -1970,13 +1746,13 @@ def main():
                         "message": "❌ " + message
                     }
                 
-                set_rerun()
+                st.experimental_rerun()
         
         with col2:
             if st.button("Cancel", type="secondary", use_container_width=True):
                 st.session_state.show_feedback_popup = False
                 st.session_state.feedback_data = {}
-                set_rerun()
+                st.experimental_rerun()
 
     # Display feedback status if exists
     if st.session_state.feedback_status:
@@ -1990,11 +1766,6 @@ def main():
         
         # Clear status after displaying
         st.session_state.feedback_status = None
-
-    # Check if we need to rerun at the end of the main function
-    if st.session_state.needs_rerun:
-        st.session_state.needs_rerun = False
-        st.rerun()
 
 if __name__ == "__main__":
     main()
