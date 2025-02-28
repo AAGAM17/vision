@@ -1194,93 +1194,95 @@ def main():
 
     # Information Guide Section
     with st.expander("ℹ️ Information Guide - What can be extracted?"):
-        st.markdown("""
-            <div class="card" style="margin-bottom: 1rem;">
-                <h3 style="margin-bottom: 1rem;">Supported Drawing Types and Extractable Information</h3>
-                
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
-                    <!-- Cylinder Section -->
-                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
-                        <h4 style="color: var(--primary-color);">🔧 Hydraulic/Pneumatic Cylinder</h4>
-                        <ul style="list-style-type: none; padding-left: 0;">
-                            <li>• Cylinder Action (Single/Double)</li>
-                            <li>• Bore Diameter (mm)</li>
-                            <li>• Rod Diameter (mm)</li>
-                            <li>• Stroke Length (mm)</li>
-                            <li>• Close Length (mm)</li>
-                            <li>• Operating Pressure (bar)</li>
-                            <li>• Operating Temperature (°C)</li>
-                            <li>• Mounting Type</li>
-                            <li>• Rod End Type</li>
-                            <li>• Fluid Type</li>
-                            <li>• Drawing Number</li>
-                        </ul>
-                    </div>
+        st.markdown("### Supported Drawing Types and Extractable Information")
+        
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "🔧 Cylinder", 
+            "🔵 Valve", 
+            "⚙️ Gearbox", 
+            "🔩 Hex Nut", 
+            "🏗️ Lifting Ram"
+        ])
+        
+        with tab1:
+            st.markdown("#### 🔧 Hydraulic/Pneumatic Cylinder")
+            st.markdown("""
+                The following parameters will be extracted:
+                - Cylinder Action (Single/Double)
+                - Bore Diameter (mm)
+                - Rod Diameter (mm)
+                - Stroke Length (mm)
+                - Close Length (mm)
+                - Operating Pressure (bar)
+                - Operating Temperature (°C)
+                - Mounting Type
+                - Rod End Type
+                - Fluid Type
+                - Drawing Number
+            """)
+        
+        with tab2:
+            st.markdown("#### 🔵 Valve")
+            st.markdown("""
+                The following parameters will be extracted:
+                - Model Number
+                - Size of Valve (mm/l/min)
+                - Pressure Rating (bar)
+                - Manufacturer
+            """)
+        
+        with tab3:
+            st.markdown("#### ⚙️ Gearbox")
+            st.markdown("""
+                The following parameters will be extracted:
+                - Type
+                - Number of Teeth
+                - Module
+                - Material
+                - Pressure Angle (deg)
+                - Face Width/Length (mm)
+                - Hand
+                - Mounting
+                - Helix Angle (deg)
+                - Drawing Number
+            """)
+        
+        with tab4:
+            st.markdown("#### 🔩 Hex Nut")
+            st.markdown("""
+                The following parameters will be extracted:
+                - Type
+                - Size
+                - Property Class
+                - Thread Pitch
+                - Coating
+                - Nut Standard
+                - Drawing Number
+            """)
+        
+        with tab5:
+            st.markdown("#### 🏗️ Lifting Ram")
+            st.markdown("""
+                The following parameters will be extracted:
+                - Height (mm)
+                - Total Stroke (mm)
+                - Piston Stroke (mm)
+                - Piston Lifting Force (kN)
+                - Weight (kg)
+                - Oil Volume (l)
+                - Drawing Number
+            """)
 
-                    <!-- Valve Section -->
-                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
-                        <h4 style="color: var(--primary-color);">🔵 Valve</h4>
-                        <ul style="list-style-type: none; padding-left: 0;">
-                            <li>• Model Number</li>
-                            <li>• Size of Valve (mm/l/min)</li>
-                            <li>• Pressure Rating (bar)</li>
-                            <li>• Manufacturer</li>
-                        </ul>
-                    </div>
-
-                    <!-- Gearbox Section -->
-                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
-                        <h4 style="color: var(--primary-color);">⚙️ Gearbox</h4>
-                        <ul style="list-style-type: none; padding-left: 0;">
-                            <li>• Type</li>
-                            <li>• Number of Teeth</li>
-                            <li>• Module</li>
-                            <li>• Material</li>
-                            <li>• Pressure Angle (deg)</li>
-                            <li>• Face Width/Length (mm)</li>
-                            <li>• Hand</li>
-                            <li>• Mounting</li>
-                            <li>• Helix Angle (deg)</li>
-                            <li>• Drawing Number</li>
-                        </ul>
-                    </div>
-
-                    <!-- Nut Section -->
-                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
-                        <h4 style="color: var(--primary-color);">🔩 Hex Nut</h4>
-                        <ul style="list-style-type: none; padding-left: 0;">
-                            <li>• Type</li>
-                            <li>• Size</li>
-                            <li>• Property Class</li>
-                            <li>• Thread Pitch</li>
-                            <li>• Coating</li>
-                            <li>• Nut Standard</li>
-                            <li>• Drawing Number</li>
-                        </ul>
-                    </div>
-
-                    <!-- Lifting Ram Section -->
-                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
-                        <h4 style="color: var(--primary-color);">🏗️ Lifting Ram</h4>
-                        <ul style="list-style-type: none; padding-left: 0;">
-                            <li>• Height (mm)</li>
-                            <li>• Total Stroke (mm)</li>
-                            <li>• Piston Stroke (mm)</li>
-                            <li>• Piston Lifting Force (kN)</li>
-                            <li>• Weight (kg)</li>
-                            <li>• Oil Volume (l)</li>
-                            <li>• Drawing Number</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                    <h4 style="color: var(--primary-color);">🔄 Custom Product Types</h4>
-                    <p>You can add custom product types with their own parameters using the sidebar menu.</p>
-                    <p style="color: var(--text-muted);">Note: All measurements are automatically converted to the specified units.</p>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.divider()
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("#### 🔄 Custom Product Types")
+            st.markdown("""
+                You can add custom product types with their own parameters using the sidebar menu.
+                All measurements are automatically converted to the specified units.
+            """)
+        with col2:
+            st.info("💡 To add a custom product type:\n1. Open the sidebar\n2. Enter product name\n3. Add required parameters\n4. Save the new product type")
 
     # Add New Product Section
     with st.sidebar:
