@@ -336,8 +336,12 @@ def analyze_gearbox_image(image_bytes):
         return f"❌ Processing Error: {str(e)}"
 
 def identify_drawing_type(image_bytes):
-    """Identify if the drawing is a cylinder, valve, gearbox, hex nut, or lifting ram"""
+    """Identify if the drawing is a cylinder, valve, gearbox, hex nut, lifting ram, or custom product type"""
     base64_image = encode_image_to_base64(image_bytes)
+    
+    # First, get all custom product types
+    custom_types = list(st.session_state.custom_products.keys())
+    custom_types_str = ", ".join(custom_types) if custom_types else "no custom types"
     
     payload = {
         "model": "qwen/qwen2.5-vl-72b-instruct:free",
@@ -348,16 +352,20 @@ def identify_drawing_type(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Look at this engineering drawing and identify if it is a:\n"
-                            "1. Hydraulic/Pneumatic Cylinder\n"
-                            "2. Valve\n"
-                            "3. Gearbox\n"
-                            "4. Hex Nut\n"
-                            "5. Lifting Ram\n\n"
+                            "Look at this engineering drawing and identify its type.\n"
                             "STRICT RULES:\n"
-                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, GEARBOX, NUT, or LIFTING_RAM\n"
-                            "2. Do not repeat the word or add any other text\n"
-                            "3. The response should be exactly one word"
+                            "1. First check if it matches any of these standard types:\n"
+                            "   - Hydraulic/Pneumatic Cylinder\n"
+                            "   - Valve\n"
+                            "   - Gearbox\n"
+                            "   - Hex Nut\n"
+                            "   - Lifting Ram\n\n"
+                            f"2. If it doesn't match any standard type, check if it matches these custom types: {custom_types_str}\n\n"
+                            "3. ONLY respond with one of these exact words:\n"
+                            "   - For standard types: CYLINDER, VALVE, GEARBOX, NUT, or LIFTING_RAM\n"
+                            "   - For custom types, use the exact custom type name\n"
+                            "4. If it doesn't match any type, respond with UNKNOWN\n"
+                            "5. The response should be exactly one word"
                         )
                     },
                     {
@@ -380,19 +388,118 @@ def identify_drawing_type(image_bytes):
         
         if "❌" not in result:
             drawing_type = result.strip().upper()
-            if "CYLINDER" in drawing_type:
-                return "CYLINDER"
-            elif "VALVE" in drawing_type:
-                return "VALVE"
-            elif "GEARBOX" in drawing_type:
-                return "GEARBOX"
-            elif "NUT" in drawing_type:
-                return "NUT"
-            elif "LIFTING_RAM" in drawing_type or "LIFTING RAM" in drawing_type:
-                return "LIFTING_RAM"
-        else:
-            return f"❌ Invalid drawing type: {drawing_type}"
+            # Check for standard types
+            if drawing_type in ["CYLINDER", "VALVE", "GEARBOX", "NUT", "LIFTING_RAM"]:
+                return drawing_type
+            # Check for custom types
+            elif drawing_type in [t.upper() for t in custom_types]:
+                return drawing_type
+            else:
+                return "❌ Unknown drawing type"
         return result
+    except Exception as e:
+        return f"❌ Processing Error: {str(e)}"
+
+def create_optimized_prompt(product_type, image_bytes):
+    """Create an optimized prompt for the custom product type using Qwen's vision ability"""
+    base64_image = encode_image_to_base64(image_bytes)
+    
+    # Get the parameters for this product type
+    product_params = st.session_state.custom_products[product_type]['parameters']
+    params_str = "\n".join([f"- {param}" for param in product_params])
+    
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"You are looking at a {product_type} engineering drawing. "
+                            "Create an optimized prompt to extract these parameters accurately:\n\n"
+                            f"{params_str}\n\n"
+                            "Based on what you see in the drawing, create a detailed prompt that will help extract "
+                            "these parameters accurately. Include specific instructions about:\n"
+                            "1. Where to look for each parameter in the drawing\n"
+                            "2. How to handle different formats or notations\n"
+                            "3. Any specific conversion rules needed\n"
+                            "4. How to validate the extracted values\n\n"
+                            "Return the prompt in this format:\n"
+                            "PROMPT: [Your detailed prompt here]"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        result = process_api_response(response)
+        if result and "❌" not in result:
+            # Extract the prompt part
+            if "PROMPT:" in result:
+                return result.split("PROMPT:")[1].strip()
+            return result
+        return None
+    except Exception as e:
+        st.error(f"Error creating optimized prompt: {str(e)}")
+        return None
+
+def analyze_custom_product(image_bytes, product_type):
+    """Analyze custom product drawings using an optimized prompt"""
+    base64_image = encode_image_to_base64(image_bytes)
+    
+    # Get or create optimized prompt
+    if 'optimized_prompt' not in st.session_state.custom_products[product_type]:
+        with st.spinner("Creating optimized prompt for analysis..."):
+            optimized_prompt = create_optimized_prompt(product_type, image_bytes)
+            if optimized_prompt:
+                st.session_state.custom_products[product_type]['optimized_prompt'] = optimized_prompt
+            else:
+                # Fallback to basic prompt if optimization fails
+                optimized_prompt = st.session_state.custom_products[product_type]['prompt']
+    else:
+        optimized_prompt = st.session_state.custom_products[product_type]['optimized_prompt']
+    
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": optimized_prompt
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        return process_api_response(response, analyze_custom_product, image_bytes, product_type)
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
@@ -1361,7 +1468,7 @@ def main():
                 with col1:
                     # Show preview of the file
                     if file.type == "application/pdf":
-                        st.markdown(f"�� PDF: {file.name}")
+                        st.markdown(f"PDF: {file.name}")
                     else:
                         st.image(file, width=150)
                 
@@ -1426,6 +1533,8 @@ def main():
                                                 result = analyze_nut_image(image_bytes)
                                             elif drawing_type == "LIFTING_RAM":
                                                 result = analyze_lifting_ram_image(image_bytes)
+                                            elif drawing_type in st.session_state.custom_products:
+                                                result = analyze_custom_product(image_bytes, drawing_type)
                                             
                                             if result and "❌" not in result:
                                                 # Update with successful results
