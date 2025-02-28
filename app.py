@@ -336,8 +336,20 @@ def analyze_gearbox_image(image_bytes):
         return f"❌ Processing Error: {str(e)}"
 
 def identify_drawing_type(image_bytes):
-    """Identify if the drawing is a cylinder, valve, gearbox, hex nut, or lifting ram"""
+    """Identify the drawing type including custom types and generate appropriate prompts"""
     base64_image = encode_image_to_base64(image_bytes)
+    
+    # Get list of custom products
+    custom_types = list(st.session_state.custom_products.keys()) if hasattr(st.session_state, 'custom_products') else []
+    
+    # Create the type list for the prompt
+    type_list = "\n".join([
+        "1. Hydraulic/Pneumatic Cylinder",
+        "2. Valve",
+        "3. Gearbox",
+        "4. Hex Nut",
+        "5. Lifting Ram"
+    ] + [f"{i+6}. {type_name}" for i, type_name in enumerate(custom_types)])
     
     payload = {
         "model": "qwen/qwen2.5-vl-72b-instruct:free",
@@ -348,16 +360,14 @@ def identify_drawing_type(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Look at this engineering drawing and identify if it is a:\n"
-                            "1. Hydraulic/Pneumatic Cylinder\n"
-                            "2. Valve\n"
-                            "3. Gearbox\n"
-                            "4. Hex Nut\n"
-                            "5. Lifting Ram\n\n"
+                            f"Look at this engineering drawing and identify if it is one of these types:\n"
+                            f"{type_list}\n\n"
                             "STRICT RULES:\n"
-                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, GEARBOX, NUT, or LIFTING_RAM\n"
+                            "1. ONLY respond with one of these exact words: CYLINDER, VALVE, GEARBOX, NUT, LIFTING_RAM"
+                            + (f", {', '.join(custom_types).upper()}" if custom_types else "") + "\n"
                             "2. Do not repeat the word or add any other text\n"
-                            "3. The response should be exactly one word"
+                            "3. The response should be exactly one word\n"
+                            "4. If it's a new type not in the list, respond with UNKNOWN"
                         )
                     },
                     {
@@ -380,18 +390,46 @@ def identify_drawing_type(image_bytes):
         
         if "❌" not in result:
             drawing_type = result.strip().upper()
-            if "CYLINDER" in drawing_type:
-                return "CYLINDER"
-            elif "VALVE" in drawing_type:
-                return "VALVE"
-            elif "GEARBOX" in drawing_type:
-                return "GEARBOX"
-            elif "NUT" in drawing_type:
-                return "NUT"
-            elif "LIFTING_RAM" in drawing_type or "LIFTING RAM" in drawing_type:
-                return "LIFTING_RAM"
-        else:
-            return f"❌ Invalid drawing type: {drawing_type}"
+            
+            # If it's a custom type, generate a prompt for it
+            if drawing_type in [t.upper() for t in custom_types]:
+                # Generate a prompt for the custom type
+                prompt_payload = {
+                    "model": "qwen/qwen2.5-vl-72b-instruct:free",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": (
+                                        f"You are analyzing a {drawing_type} engineering drawing.\n"
+                                        f"The required parameters to extract are: {', '.join(st.session_state.custom_products[drawing_type]['parameters'])}.\n"
+                                        "Generate a prompt that will help extract these parameters accurately.\n"
+                                        "The prompt should:\n"
+                                        "1. Be specific to technical drawings\n"
+                                        "2. Include instructions for handling missing/unclear values\n"
+                                        "3. Specify the exact format for the response\n"
+                                        "4. Include relevant units if applicable\n"
+                                        "5. Focus on extracting values marked in RED or highlighted\n"
+                                        "Format the prompt similar to existing ones in the system."
+                                    )
+                                }
+                            ]
+                        }
+                    ]
+                }
+                
+                prompt_response = requests.post(API_URL, headers=headers, json=prompt_payload)
+                generated_prompt = process_api_response(prompt_response)
+                
+                if generated_prompt and "❌" not in generated_prompt:
+                    st.session_state.custom_products[drawing_type]['prompt'] = generated_prompt
+            
+            # Return the identified type
+            if drawing_type in ["CYLINDER", "VALVE", "GEARBOX", "NUT", "LIFTING_RAM"] or drawing_type in [t.upper() for t in custom_types]:
+                return drawing_type
+            return "UNKNOWN"
         return result
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
@@ -543,6 +581,44 @@ def analyze_lifting_ram_image(image_bytes):
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
         return process_api_response(response, analyze_lifting_ram_image, image_bytes)
+    except Exception as e:
+        return f"❌ Processing Error: {str(e)}"
+
+def analyze_custom_drawing(image_bytes, drawing_type):
+    """Analyze a custom drawing type using its generated prompt"""
+    if drawing_type not in st.session_state.custom_products:
+        return "❌ Drawing type not found in custom products"
+    
+    base64_image = encode_image_to_base64(image_bytes)
+    prompt = st.session_state.custom_products[drawing_type]['prompt']
+    
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {st.session_state.current_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        return process_api_response(response, analyze_custom_drawing, image_bytes)
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
@@ -1334,6 +1410,9 @@ def main():
                                             result = analyze_nut_image(image_bytes)
                                         elif drawing_type == "LIFTING_RAM":
                                             result = analyze_lifting_ram_image(image_bytes)
+                                        elif drawing_type.upper() in [t.upper() for t in st.session_state.custom_products.keys()]:
+                                            # Handle custom drawing type
+                                            result = analyze_custom_drawing(image_bytes, drawing_type)
                                         
                                         if result and "❌" not in result:
                                             # Update with successful results
@@ -1350,7 +1429,9 @@ def main():
                                             st.session_state.all_results[drawing_number] = parsed_results
                                             
                                             # Update status
-                                            parameters = get_parameters_for_type(drawing_type)
+                                            parameters = (st.session_state.custom_products[drawing_type]['parameters'] 
+                                                        if drawing_type.upper() in [t.upper() for t in st.session_state.custom_products.keys()]
+                                                        else get_parameters_for_type(drawing_type))
                                             non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
                                             total_fields = len(parameters)
                                             
