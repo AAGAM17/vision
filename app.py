@@ -335,8 +335,11 @@ def analyze_gearbox_image(image_bytes):
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
 
-def identify_drawing_type(image_bytes):
+def identify_drawing_type(image_bytes, is_custom=False, custom_type=None):
     """Identify if the drawing is a cylinder, valve, gearbox, hex nut, or lifting ram"""
+    if is_custom and custom_type:
+        return custom_type.upper()
+        
     base64_image = encode_image_to_base64(image_bytes)
     
     payload = {
@@ -348,16 +351,18 @@ def identify_drawing_type(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Look at this engineering drawing and identify if it is a:\n"
-                            "1. Hydraulic/Pneumatic Cylinder\n"
-                            "2. Valve\n"
-                            "3. Gearbox\n"
-                            "4. Hex Nut\n"
-                            "5. Lifting Ram\n\n"
+                            "You are a specialized engineering drawing analyzer. Look at this technical drawing carefully.\n"
+                            "Task: Identify the exact type of component shown in this engineering drawing.\n\n"
                             "STRICT RULES:\n"
                             "1. ONLY respond with one of these exact words: CYLINDER, VALVE, GEARBOX, NUT, or LIFTING_RAM\n"
-                            "2. Do not repeat the word or add any other text\n"
-                            "3. The response should be exactly one word"
+                            "2. Look for these specific indicators:\n"
+                            "   - CYLINDER: Look for piston, rod, bore diameter, stroke length\n"
+                            "   - VALVE: Look for flow paths, ports, valve body, spool or gate\n"
+                            "   - GEARBOX: Look for gear teeth, shafts, gear ratios, housing\n"
+                            "   - NUT: Look for hexagonal shape, thread specifications\n"
+                            "   - LIFTING_RAM: Look for hydraulic ram, lifting mechanism, force ratings\n"
+                            "3. Do not add any other text or explanation\n"
+                            "4. If unsure, do not guess - respond with UNKNOWN\n"
                         )
                     },
                     {
@@ -380,18 +385,8 @@ def identify_drawing_type(image_bytes):
         
         if "❌" not in result:
             drawing_type = result.strip().upper()
-            if "CYLINDER" in drawing_type:
-                return "CYLINDER"
-            elif "VALVE" in drawing_type:
-                return "VALVE"
-            elif "GEARBOX" in drawing_type:
-                return "GEARBOX"
-            elif "NUT" in drawing_type:
-                return "NUT"
-            elif "LIFTING_RAM" in drawing_type or "LIFTING RAM" in drawing_type:
-                return "LIFTING_RAM"
-        else:
-            return f"❌ Invalid drawing type: {drawing_type}"
+            if drawing_type in ["CYLINDER", "VALVE", "GEARBOX", "NUT", "LIFTING_RAM", "UNKNOWN"]:
+                return drawing_type if drawing_type != "UNKNOWN" else "❌ Could not identify drawing type"
         return result
     except Exception as e:
         return f"❌ Processing Error: {str(e)}"
@@ -1380,6 +1375,22 @@ def main():
                     # Add process button
                     if st.button(f"Process Drawing", key=f"process_{idx}"):
                         try:
+                            # Add type selector
+                            drawing_type_options = ["Auto Detect", "From Custom Products"]
+                            type_selection = st.radio(
+                                "Select Drawing Type",
+                                drawing_type_options,
+                                key=f"type_select_{idx}"
+                            )
+                            
+                            custom_type = None
+                            if type_selection == "From Custom Products" and st.session_state.custom_products:
+                                custom_type = st.selectbox(
+                                    "Select Custom Product Type",
+                                    options=list(st.session_state.custom_products.keys()),
+                                    key=f"custom_type_{idx}"
+                                )
+                            
                             # Process the file
                             processed_images = process_uploaded_file(file)
                             
@@ -1391,7 +1402,11 @@ def main():
                             for img_idx, image_bytes in enumerate(processed_images):
                                 # Step 1: Identify drawing type
                                 with st.spinner('Identifying drawing type...'):
-                                    drawing_type = identify_drawing_type(image_bytes)
+                                    drawing_type = identify_drawing_type(
+                                        image_bytes,
+                                        is_custom=(type_selection == "From Custom Products"),
+                                        custom_type=custom_type
+                                    )
                                     
                                     if not drawing_type or "❌" in drawing_type:
                                         st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
