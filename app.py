@@ -1126,9 +1126,46 @@ def main():
                                             continue
                                     
                                     # Process the drawing with the updated process_drawing function
-                                    result = process_drawing(image_bytes, drawing_type, st.session_state.custom_products if check_custom else None)
-                                    
-                                    # ... rest of the existing processing code ...
+                                    with st.spinner(f'Processing drawing {img_idx + 1} of {len(processed_images)}...'):
+                                        result = process_drawing(image_bytes, drawing_type, st.session_state.custom_products if check_custom else None)
+                                        
+                                        if "❌" in result:
+                                            st.error(result)
+                                            continue
+                                        
+                                        # Parse the results
+                                        parsed_results = parse_ai_response(result)
+                                        
+                                        # Get drawing number
+                                        drawing_number = parsed_results.get('DRAWING NUMBER', f'UNKNOWN_{img_idx}')
+                                        
+                                        # Store results and image in session state
+                                        st.session_state.all_results[drawing_number] = parsed_results
+                                        st.session_state.current_image[drawing_number] = image_bytes
+                                        
+                                        # Calculate metrics
+                                        parameters = get_parameters_for_type(drawing_type)
+                                        filled_fields = sum(1 for param in parameters if parsed_results.get(param, '').strip())
+                                        total_fields = len(parameters)
+                                        confidence_score = int((filled_fields / total_fields) * 100)
+                                        
+                                        # Create new row for drawings table
+                                        new_row = pd.DataFrame([{
+                                            'Drawing Type': drawing_type,
+                                            'Drawing No.': drawing_number,
+                                            'Processing Status': 'Completed' if filled_fields == total_fields else 'Needs Review!',
+                                            'Extracted Fields Count': f"{filled_fields}/{total_fields}",
+                                            'Confidence Score': f"{confidence_score}%"
+                                        }])
+                                        
+                                        # Update drawings table
+                                        st.session_state.drawings_table = pd.concat(
+                                            [st.session_state.drawings_table, new_row], 
+                                            ignore_index=True
+                                        )
+                                        
+                                        st.success(f"✅ Successfully processed drawing {img_idx + 1}")
+                                        
                             except Exception as e:
                                 st.error(f"❌ Error processing {file.name}: {str(e)}")
                             set_rerun()
