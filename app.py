@@ -1192,6 +1192,96 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
+    # Information Guide Section
+    with st.expander("ℹ️ Information Guide - What can be extracted?"):
+        st.markdown("""
+            <div class="card" style="margin-bottom: 1rem;">
+                <h3 style="margin-bottom: 1rem;">Supported Drawing Types and Extractable Information</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+                    <!-- Cylinder Section -->
+                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
+                        <h4 style="color: var(--primary-color);">🔧 Hydraulic/Pneumatic Cylinder</h4>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li>• Cylinder Action (Single/Double)</li>
+                            <li>• Bore Diameter (mm)</li>
+                            <li>• Rod Diameter (mm)</li>
+                            <li>• Stroke Length (mm)</li>
+                            <li>• Close Length (mm)</li>
+                            <li>• Operating Pressure (bar)</li>
+                            <li>• Operating Temperature (°C)</li>
+                            <li>• Mounting Type</li>
+                            <li>• Rod End Type</li>
+                            <li>• Fluid Type</li>
+                            <li>• Drawing Number</li>
+                        </ul>
+                    </div>
+
+                    <!-- Valve Section -->
+                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
+                        <h4 style="color: var(--primary-color);">🔵 Valve</h4>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li>• Model Number</li>
+                            <li>• Size of Valve (mm/l/min)</li>
+                            <li>• Pressure Rating (bar)</li>
+                            <li>• Manufacturer</li>
+                        </ul>
+                    </div>
+
+                    <!-- Gearbox Section -->
+                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
+                        <h4 style="color: var(--primary-color);">⚙️ Gearbox</h4>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li>• Type</li>
+                            <li>• Number of Teeth</li>
+                            <li>• Module</li>
+                            <li>• Material</li>
+                            <li>• Pressure Angle (deg)</li>
+                            <li>• Face Width/Length (mm)</li>
+                            <li>• Hand</li>
+                            <li>• Mounting</li>
+                            <li>• Helix Angle (deg)</li>
+                            <li>• Drawing Number</li>
+                        </ul>
+                    </div>
+
+                    <!-- Nut Section -->
+                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
+                        <h4 style="color: var(--primary-color);">🔩 Hex Nut</h4>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li>• Type</li>
+                            <li>• Size</li>
+                            <li>• Property Class</li>
+                            <li>• Thread Pitch</li>
+                            <li>• Coating</li>
+                            <li>• Nut Standard</li>
+                            <li>• Drawing Number</li>
+                        </ul>
+                    </div>
+
+                    <!-- Lifting Ram Section -->
+                    <div class="card" style="background: var(--bg-light); padding: 1rem;">
+                        <h4 style="color: var(--primary-color);">🏗️ Lifting Ram</h4>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li>• Height (mm)</li>
+                            <li>• Total Stroke (mm)</li>
+                            <li>• Piston Stroke (mm)</li>
+                            <li>• Piston Lifting Force (kN)</li>
+                            <li>• Weight (kg)</li>
+                            <li>• Oil Volume (l)</li>
+                            <li>• Drawing Number</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                    <h4 style="color: var(--primary-color);">🔄 Custom Product Types</h4>
+                    <p>You can add custom product types with their own parameters using the sidebar menu.</p>
+                    <p style="color: var(--text-muted);">Note: All measurements are automatically converted to the specified units.</p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
     # Add New Product Section
     with st.sidebar:
         st.markdown("### Add New Product Type")
@@ -1255,147 +1345,147 @@ def main():
             if file_id not in existing_files:
                 st.session_state.processing_queue.append(uploaded_file)
 
-        # Display uploaded files in a compact layout
-        st.markdown("""
-            <div class="card" style="margin-top: 1rem; padding: 1rem;">
-                <h4 style="color: var(--primary-color); margin-bottom: 0.5rem;">Uploaded Drawings</h4>
-                <div class="uploaded-drawings-container">
-        """, unsafe_allow_html=True)
+            # Display uploaded files in a compact layout
+            st.markdown("""
+                <div class="card" style="margin-top: 1rem; padding: 1rem;">
+                    <h4 style="color: var(--primary-color); margin-bottom: 0.5rem;">Uploaded Drawings</h4>
+                    <div class="uploaded-drawings-container">
+            """, unsafe_allow_html=True)
 
-        # Process each uploaded file
-        for idx, file in enumerate(uploaded_files):
-            col1, col2 = st.columns([2, 3])
-            
-            with col1:
-                # Show preview of the file
-                if file.type == "application/pdf":
-                    st.markdown(f"📄 PDF: {file.name}")
-                else:
-                    st.image(file, width=150)
-            
-            with col2:
-                # Show file info and processing status
-                st.markdown(f"""
-                    <div style="margin-bottom: 0.5rem;">
-                        <strong style="color: var(--primary-color);">{file.name}</strong>
+            # Process each uploaded file
+            for idx, file in enumerate(uploaded_files):
+                col1, col2 = st.columns([2, 3])
+                
+                with col1:
+                    # Show preview of the file
+                    if file.type == "application/pdf":
+                        st.markdown(f"�� PDF: {file.name}")
+                    else:
+                        st.image(file, width=150)
+                
+                with col2:
+                    # Show file info and processing status
+                    st.markdown(f"""
+                        <div style="margin-bottom: 0.5rem;">
+                            <strong style="color: var(--primary-color);">{file.name}</strong>
                         <span style="color: var(--text-muted);">({file.type})</span>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                col2_1, col2_2 = st.columns([3, 2])
-                
-                with col2_1:
-                    # Add process button
-                    if st.button(f"Process Drawing", key=f"process_{idx}"):
-                        try:
-                            # Process the file
-                            processed_images = process_uploaded_file(file)
-                            
-                            if not processed_images:
-                                st.error(f"Failed to process {file.name}")
-                                continue
-                            
-                            # Process each image from the file
-                            for img_idx, image_bytes in enumerate(processed_images):
-                                # Step 1: Identify drawing type
-                                with st.spinner('Identifying drawing type...'):
-                                    drawing_type = identify_drawing_type(image_bytes)
-                                    
-                                    if not drawing_type or "❌" in drawing_type:
-                                        st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
-                                        continue
-                                    
-                                    # Initialize new drawing entry
-                                    suffix = f"_page_{img_idx + 1}" if len(processed_images) > 1 else ""
-                                    new_drawing = {
-                                        'Drawing Type': drawing_type,
-                                        'Drawing No.': f"Processing{suffix}",
-                                        'Processing Status': 'Processing..',
-                                        'Extracted Fields Count': '',
-                                        'Confidence Score': ''
-                                    }
-                                    
-                                    # Add to table
-                                    st.session_state.drawings_table = pd.concat([
-                                        st.session_state.drawings_table,
-                                        pd.DataFrame([new_drawing])
-                                    ], ignore_index=True)
-                                    
-                                    # Process the drawing based on type
-                                    with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
-                                        result = None
-                                        if drawing_type == "CYLINDER":
-                                            result = analyze_cylinder_image(image_bytes)
-                                        elif drawing_type == "VALVE":
-                                            result = analyze_valve_image(image_bytes)
-                                        elif drawing_type == "GEARBOX":
-                                            result = analyze_gearbox_image(image_bytes)
-                                        elif drawing_type == "NUT":
-                                            result = analyze_nut_image(image_bytes)
-                                        elif drawing_type == "LIFTING_RAM":
-                                            result = analyze_lifting_ram_image(image_bytes)
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    col2_1, col2_2 = st.columns([3, 2])
+                    
+                    with col2_1:
+                        # Add process button
+                        if st.button(f"Process Drawing", key=f"process_{idx}"):
+                            try:
+                                # Process the file
+                                processed_images = process_uploaded_file(file)
+                                
+                                if not processed_images:
+                                    st.error(f"Failed to process {file.name}")
+                                    continue
+                                
+                                # Process each image from the file
+                                for img_idx, image_bytes in enumerate(processed_images):
+                                    # Step 1: Identify drawing type
+                                    with st.spinner('Identifying drawing type...'):
+                                        drawing_type = identify_drawing_type(image_bytes)
                                         
-                                        if result and "❌" not in result:
-                                            # Update with successful results
-                                            parsed_results = parse_ai_response(result)
-                                            drawing_number = (parsed_results.get('MODEL NO', '') 
-                                                            if drawing_type == "VALVE" 
-                                                            else parsed_results.get('DRAWING NUMBER', ''))
-                                            
-                                            if not drawing_number or drawing_number == 'Unknown':
-                                                drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}{suffix}"
-                                            
-                                            # Store the image
-                                            st.session_state.current_image[drawing_number] = image_bytes
-                                            st.session_state.all_results[drawing_number] = parsed_results
-                                            
-                                            # Update status
-                                            parameters = get_parameters_for_type(drawing_type)
-                                            non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
-                                            total_fields = len(parameters)
-                                            
-                                            new_drawing.update({
-                                                'Drawing No.': drawing_number,
-                                                'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
-                                                'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
-                                                'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
-                                            })
-                                            
-                                            st.success(f"✅ Successfully processed page {img_idx + 1} of {file.name}")
-                                            
-                                            # Add view button after successful processing
-                                            st.markdown(f"""
-                                                <div style="margin-top: 0.5rem;">
-                                                    <div class="status-badge" style="background: rgba(39, 174, 96, 0.1); color: var(--success-color);">
-                                                        Processed Successfully
-                                                    </div>
-                                                </div>
-                                            """, unsafe_allow_html=True)
-                                            
-                                            if st.button("View Results", key=f"view_results_{idx}_{img_idx}"):
-                                                select_drawing(drawing_number)
-                                            
-                                        else:
-                                            st.error(f"❌ Failed to process page {img_idx + 1} of {file.name}")
-                                            new_drawing.update({
-                                                'Processing Status': 'Failed',
-                                                'Confidence Score': '0%',
-                                                'Extracted Fields Count': '0/0'
-                                            })
-                                            
-                                            # Show error status
-                                            st.markdown(f"""
-                                                <div style="margin-top: 0.5rem;">
-                                                    <div class="status-badge" style="background: rgba(231, 76, 60, 0.1); color: var(--danger-color);">
-                                                        Processing Failed
-                                                    </div>
-                                                </div>
-                                            """, unsafe_allow_html=True)
+                                        if not drawing_type or "❌" in drawing_type:
+                                            st.error(drawing_type if drawing_type else "❌ Could not identify drawing type")
+                                            continue
                                         
-                                        # Update the table
-                                        st.session_state.drawings_table.iloc[-1] = new_drawing
-                        except Exception as e:
-                            st.error(f"❌ Error processing {file.name}: {str(e)}")
+                                        # Initialize new drawing entry
+                                        suffix = f"_page_{img_idx + 1}" if len(processed_images) > 1 else ""
+                                        new_drawing = {
+                                            'Drawing Type': drawing_type,
+                                            'Drawing No.': f"Processing{suffix}",
+                                            'Processing Status': 'Processing..',
+                                            'Extracted Fields Count': '',
+                                            'Confidence Score': ''
+                                        }
+                                        
+                                        # Add to table
+                                        st.session_state.drawings_table = pd.concat([
+                                            st.session_state.drawings_table,
+                                            pd.DataFrame([new_drawing])
+                                        ], ignore_index=True)
+                                        
+                                        # Process the drawing based on type
+                                        with st.spinner(f'Analyzing {drawing_type.lower()} drawing...'):
+                                            result = None
+                                            if drawing_type == "CYLINDER":
+                                                result = analyze_cylinder_image(image_bytes)
+                                            elif drawing_type == "VALVE":
+                                                result = analyze_valve_image(image_bytes)
+                                            elif drawing_type == "GEARBOX":
+                                                result = analyze_gearbox_image(image_bytes)
+                                            elif drawing_type == "NUT":
+                                                result = analyze_nut_image(image_bytes)
+                                            elif drawing_type == "LIFTING_RAM":
+                                                result = analyze_lifting_ram_image(image_bytes)
+                                            
+                                            if result and "❌" not in result:
+                                                # Update with successful results
+                                                parsed_results = parse_ai_response(result)
+                                                drawing_number = (parsed_results.get('MODEL NO', '') 
+                                                                if drawing_type == "VALVE" 
+                                                                else parsed_results.get('DRAWING NUMBER', ''))
+                                                
+                                                if not drawing_number or drawing_number == 'Unknown':
+                                                    drawing_number = f"{drawing_type}_{len(st.session_state.drawings_table)}{suffix}"
+                                                
+                                                # Store the image
+                                                st.session_state.current_image[drawing_number] = image_bytes
+                                                st.session_state.all_results[drawing_number] = parsed_results
+                                                
+                                                # Update status
+                                                parameters = get_parameters_for_type(drawing_type)
+                                                non_empty_fields = sum(1 for k in parameters if parsed_results.get(k, '').strip())
+                                                total_fields = len(parameters)
+                                                
+                                                new_drawing.update({
+                                                    'Drawing No.': drawing_number,
+                                                    'Processing Status': 'Completed' if non_empty_fields == total_fields else 'Needs Review!',
+                                                    'Extracted Fields Count': f"{non_empty_fields}/{total_fields}",
+                                                    'Confidence Score': f"{(non_empty_fields / total_fields * 100):.0f}%"
+                                                })
+                                                
+                                                st.success(f"✅ Successfully processed page {img_idx + 1} of {file.name}")
+                                                
+                                                # Add view button after successful processing
+                                                st.markdown(f"""
+                                                    <div style="margin-top: 0.5rem;">
+                                                        <div class="status-badge" style="background: rgba(39, 174, 96, 0.1); color: var(--success-color);">
+                                                            Processed Successfully
+                                                        </div>
+                                                    </div>
+                                                """, unsafe_allow_html=True)
+                                                
+                                                if st.button("View Results", key=f"view_results_{idx}_{img_idx}"):
+                                                    select_drawing(drawing_number)
+                                                
+                                            else:
+                                                st.error(f"❌ Failed to process page {img_idx + 1} of {file.name}")
+                                                new_drawing.update({
+                                                    'Processing Status': 'Failed',
+                                                    'Confidence Score': '0%',
+                                                    'Extracted Fields Count': '0/0'
+                                                })
+                                                
+                                                # Show error status
+                                                st.markdown(f"""
+                                                    <div style="margin-top: 0.5rem;">
+                                                        <div class="status-badge" style="background: rgba(231, 76, 60, 0.1); color: var(--danger-color);">
+                                                            Processing Failed
+                                                        </div>
+                                                    </div>
+                                                """, unsafe_allow_html=True)
+                                            
+                                            # Update the table
+                                            st.session_state.drawings_table.iloc[-1] = new_drawing
+                            except Exception as e:
+                                st.error(f"❌ Error processing {file.name}: {str(e)}")
                         set_rerun()
 
     # Display the drawings table with improved styling
