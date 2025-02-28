@@ -812,15 +812,70 @@ def process_uploaded_file(uploaded_file):
         st.error(f"Error processing file: {str(e)}")
         return None
 
-def main():
-    # Set page config
-    st.set_page_config(
-        page_title="JSW Engineering Drawing DataSheet Extractor",
-        layout="wide",
-        initial_sidebar_state="collapsed"
-    )
+def get_parameters_for_type(drawing_type):
+    """Return the list of parameters for a given drawing type"""
+    if drawing_type == "CYLINDER":
+        return [
+            "CYLINDER ACTION",
+            "BORE DIAMETER",
+            "ROD DIAMETER",
+            "STROKE LENGTH",
+            "CLOSE LENGTH",
+            "OPERATING PRESSURE",
+            "OPERATING TEMPERATURE",
+            "MOUNTING",
+            "ROD END",
+            "FLUID",
+            "DRAWING NUMBER"
+        ]
+    elif drawing_type == "VALVE":
+        return [
+            "MODEL NO",
+            "SIZE OF VALVE",
+            "PRESSURE RATING",
+            "MAKE",
+        ]
+    elif drawing_type == "GEARBOX":
+        return [
+            "TYPE",
+            "NUMBER OF TEETH",
+            "MODULE",
+            "MATERIAL",
+            "PRESSURE ANGLE",
+            "FACE WIDTH, LENGTH",
+            "HAND",
+            "MOUNTING",
+            "HELIX ANGLE",
+            "DRAWING NUMBER"
+        ]
+    elif drawing_type == "NUT":
+        return [
+            "TYPE",
+            "SIZE",
+            "PROPERTY CLASS",
+            "THREAD PITCH",
+            "COATING",
+            "NUT STANDARD",
+            "DRAWING NUMBER"
+        ]
+    elif drawing_type == "LIFTING_RAM":
+        return [
+            "HEIGHT",
+            "TOTAL STROKE",
+            "PISTON STROKE",
+            "PISTON LIFTING FORCE",
+            "WEIGHT",
+            "OIL VOLUME",
+            "DRAWING NUMBER"
+        ]
+    elif drawing_type in st.session_state.custom_products:
+        # For custom products, return their defined parameters
+        return st.session_state.custom_products[drawing_type]['parameters']
+    else:
+        return []
 
-    # Initialize all session state variables
+def initialize_session_state():
+    """Initialize all session state variables"""
     if 'drawings_table' not in st.session_state:
         st.session_state.drawings_table = pd.DataFrame(columns=[
             'Drawing Type',
@@ -852,439 +907,33 @@ def main():
     if 'needs_rerun' not in st.session_state:
         st.session_state.needs_rerun = False
 
-    # Function to handle state changes that require a rerun
-    def set_rerun():
-        st.session_state.needs_rerun = True
+def set_rerun():
+    """Set the needs_rerun flag to trigger a rerun"""
+    st.session_state.needs_rerun = True
 
-    # Function to handle drawing selection
-    def select_drawing(drawing_number):
-        st.session_state.selected_drawing = drawing_number
-        set_rerun()
+def select_drawing(drawing_number):
+    """Handle drawing selection and trigger rerun"""
+    st.session_state.selected_drawing = drawing_number
+    set_rerun()
 
-    # Custom CSS for better UI with dark mode support
+def main():
+    # Set page config
+    st.set_page_config(
+        page_title="Engineering Drawing Analyzer",
+        page_icon="📐",
+        layout="wide"
+    )
+
+    # Initialize session state
+    initialize_session_state()
+
+    # Title and description
+    st.title("📐 Engineering Drawing Analyzer")
     st.markdown("""
-        <style>
-        /* Theme colors - Light Mode */
-        [data-theme="light"] {
-            --primary-color: #2C3E50;
-            --secondary-color: #3498DB;
-            --success-color: #27AE60;
-            --warning-color: #F39C12;
-            --danger-color: #E74C3C;
-            --text-color: #2C3E50;
-            --text-muted: #95A5A6;
-            --bg-light: #F8F9FA;
-            --bg-card: #FFFFFF;
-            --border-color: #E0E0E0;
-            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
+        Extract technical specifications from engineering drawings using AI.
+        Upload your drawings and get structured data in seconds.
+    """)
 
-        /* Theme colors - Dark Mode */
-        [data-theme="dark"] {
-            --primary-color: #ECF0F1;
-            --secondary-color: #3498DB;
-            --success-color: #2ECC71;
-            --warning-color: #F1C40F;
-            --danger-color: #E74C3C;
-            --text-color: #ECF0F1;
-            --text-muted: #BDC3C7;
-            --bg-light: #2C3E50;
-            --bg-card: #34495E;
-            --border-color: #4A5568;
-            --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
-
-        /* Global styles */
-        .main {
-            padding: 2rem;
-            max-width: 1400px;
-            margin: 0 auto;
-            font-family: 'Inter', sans-serif;
-            color: var(--text-color);
-        }
-
-        /* Card containers */
-        .card {
-            background: var(--bg-card);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            border: 1px solid var(--border-color);
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Typography */
-        h1, h2, h3, h4, h5, h6 {
-            color: var(--primary-color);
-        }
-
-        p, span, div {
-            color: var(--text-color);
-        }
-
-        .text-muted {
-            color: var(--text-muted) !important;
-        }
-
-        /* Buttons */
-        .stButton>button {
-            background: linear-gradient(135deg, var(--secondary-color), #2980B9) !important;
-            color: white !important;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            width: 100%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 44px;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .stButton>button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
-            background: linear-gradient(135deg, #2980B9, #2573a7) !important;
-            opacity: 0.9;
-        }
-
-        .stButton>button:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Primary button */
-        .stButton.primary>button,
-        button[data-baseweb="button"].primary {
-            background: linear-gradient(135deg, #3498DB, #2980B9) !important;
-            color: white !important;
-        }
-
-        /* Secondary button */
-        .stButton.secondary>button,
-        button[data-baseweb="button"].secondary {
-            background: linear-gradient(135deg, #7F8C8D, #34495E) !important;
-            color: white !important;
-        }
-
-        /* Success button */
-        .stButton.success>button,
-        button[data-baseweb="button"].success {
-            background: linear-gradient(135deg, #2ECC71, #27AE60) !important;
-            color: white !important;
-        }
-
-        /* Warning button */
-        .stButton.warning>button,
-        button[data-baseweb="button"].warning {
-            background: linear-gradient(135deg, #F1C40F, #F39C12) !important;
-            color: white !important;
-        }
-
-        /* Danger button */
-        .stButton.danger>button,
-        button[data-baseweb="button"].danger {
-            background: linear-gradient(135deg, #E74C3C, #C0392B) !important;
-            color: white !important;
-        }
-
-        /* Process button specific styling */
-        button[key^="process_"] {
-            background: linear-gradient(135deg, #3498DB, #2980B9) !important;
-            color: white !important;
-            font-weight: 600 !important;
-            min-width: 150px;
-        }
-
-        /* View button specific styling */
-        button[key^="view_"] {
-            background: linear-gradient(135deg, #2ECC71, #27AE60) !important;
-            color: white !important;
-            font-weight: 600 !important;
-            min-width: 100px;
-        }
-
-        /* Back button specific styling */
-        .back-button {
-            background: linear-gradient(135deg, #7F8C8D, #34495E) !important;
-            color: white !important;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.3s ease;
-        }
-
-        .back-button:hover {
-            transform: translateY(-2px);
-            background: linear-gradient(135deg, #34495E, #2C3E50) !important;
-        }
-
-        /* Make sure text in buttons is always white */
-        .stButton>button>div,
-        .stButton>button>div>p,
-        .stButton>button>div>div,
-        .stDownloadButton>button>div {
-            color: white !important;
-        }
-
-        /* Ensure button text remains visible in both modes */
-        [data-theme="light"] .stButton>button,
-        [data-theme="dark"] .stButton>button,
-        [data-theme="light"] .stDownloadButton>button,
-        [data-theme="dark"] .stDownloadButton>button {
-            color: white !important;
-        }
-
-        [data-theme="light"] .stButton>button>div,
-        [data-theme="dark"] .stButton>button>div,
-        [data-theme="light"] .stDownloadButton>button>div,
-        [data-theme="dark"] .stDownloadButton>button>div {
-            color: white !important;
-        }
-
-        /* Additional button visibility fixes */
-        .stButton>button[kind="secondary"],
-        .stDownloadButton>button[kind="secondary"] {
-            background: linear-gradient(135deg, #7F8C8D, #34495E) !important;
-        }
-
-        .stButton>button[kind="primary"],
-        .stDownloadButton>button[kind="primary"] {
-            background: linear-gradient(135deg, #3498DB, #2980B9) !important;
-        }
-
-        /* Button container styling */
-        .button-container {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        /* Status badges */
-        .status-badge {
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-
-        /* Progress bars */
-        .progress-bar {
-            background: var(--border-color);
-            border-radius: 4px;
-            height: 6px;
-            overflow: hidden;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            border-radius: 4px;
-            transition: width 0.3s ease;
-        }
-
-        /* Form inputs */
-        .stTextInput>div>div>input {
-            background: var(--bg-light);
-            color: var(--text-color);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.75rem;
-        }
-
-        .stTextInput>div>div>input:focus {
-            border-color: var(--secondary-color);
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
-        }
-
-        /* Table styles */
-        .table-container {
-            background: var(--bg-card);
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-        }
-
-        .table-row {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            transition: background-color 0.2s ease;
-        }
-
-        .table-row:hover {
-            background: var(--bg-light);
-        }
-
-        /* Image container */
-        .image-container {
-            background: var(--bg-card);
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-        }
-
-        .image-container img {
-            border-radius: 8px;
-        }
-
-        /* Tooltips */
-        .tooltip {
-            position: relative;
-            display: inline-block;
-        }
-
-        .tooltip:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 0.5rem 1rem;
-            background: var(--bg-card);
-            color: var(--text-color);
-            border-radius: 6px;
-            font-size: 0.85rem;
-            white-space: nowrap;
-            z-index: 1000;
-            border: 1px solid var(--border-color);
-            box-shadow: var(--shadow);
-        }
-
-        /* Messages */
-        .success-message, .error-message, .info-message, .warning-message {
-            padding: 1rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-            border: 1px solid transparent;
-        }
-
-        .success-message {
-            background: rgba(46, 204, 113, 0.1);
-            border-color: var(--success-color);
-            color: var(--success-color);
-        }
-
-        .error-message {
-            background: rgba(231, 76, 60, 0.1);
-            border-color: var(--danger-color);
-            color: var(--danger-color);
-        }
-
-        .warning-message {
-            background: rgba(241, 196, 15, 0.1);
-            border-color: var(--warning-color);
-            color: var(--warning-color);
-        }
-
-        .info-message {
-            background: rgba(52, 152, 219, 0.1);
-            border-color: var(--secondary-color);
-            color: var(--secondary-color);
-        }
-
-        /* Dark mode specific overrides */
-        @media (prefers-color-scheme: dark) {
-            .card {
-                background: var(--bg-card);
-            }
-            
-            .stTextInput>div>div>input {
-                background: var(--bg-light);
-            }
-            
-            .progress-bar {
-                background: rgba(255, 255, 255, 0.1);
-            }
-            
-            .tooltip:hover::after {
-                background: var(--bg-light);
-            }
-            
-            .success-message, .error-message, .info-message, .warning-message {
-                background: rgba(255, 255, 255, 0.05);
-            }
-        }
-
-        /* File uploader styling */
-        .stFileUploader > div {
-            padding: 1rem;
-            border: 2px dashed var(--secondary-color);
-            border-radius: 8px;
-            background: var(--bg-light);
-            transition: all 0.3s ease;
-            margin: 1rem auto;
-            max-width: 600px;
-        }
-        
-        .stFileUploader > div:hover {
-            border-color: var(--primary-color);
-            background: var(--bg-card);
-            transform: translateY(-1px);
-        }
-        
-        .stFileUploader [data-testid="stFileUploadDropzone"] {
-            min-height: 100px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-muted);
-        }
-        
-        .stFileUploader [data-testid="stMarkdownContainer"] p {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        /* Compact uploaded drawings section */
-        .uploaded-drawing {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 0.75rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .uploaded-drawing img {
-            max-width: 150px;
-            height: auto;
-            border-radius: 4px;
-        }
-
-        .drawing-info {
-            flex-grow: 1;
-        }
-
-        .drawing-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # Title and description with modern styling
-    st.markdown("""
-        <div style="text-align: center; padding: 1rem 0;">
-            <h1>JSW Engineering Drawing DataSheet Extractor</h1>
-            <div style="color: var(--text-muted); font-size: 1.1rem; margin: 0.5rem 0;">
-                Automatically extract and analyze technical specifications from engineering drawings
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Information Guide Section
     with st.expander("ℹ️ Information Guide - What can be extracted?"):
         st.markdown("### Supported Drawing Types and Extractable Information")
         
@@ -1296,85 +945,64 @@ def main():
             "🏗️ Lifting Ram"
         ])
         
+        # Display parameters for each drawing type using get_parameters_for_type
         with tab1:
             st.markdown("#### 🔧 Hydraulic/Pneumatic Cylinder")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Cylinder Action (Single/Double)
-                - Bore Diameter (mm)
-                - Rod Diameter (mm)
-                - Stroke Length (mm)
-                - Close Length (mm)
-                - Operating Pressure (bar)
-                - Operating Temperature (°C)
-                - Mounting Type
-                - Rod End Type
-                - Fluid Type
-                - Drawing Number
-            """)
+            params = get_parameters_for_type("CYLINDER")
+            st.markdown("The following parameters will be extracted:")
+            for param in params:
+                st.markdown(f"- {param}")
         
         with tab2:
             st.markdown("#### 🔵 Valve")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Model Number
-                - Size of Valve (mm/l/min)
-                - Pressure Rating (bar)
-                - Manufacturer
-            """)
+            params = get_parameters_for_type("VALVE")
+            st.markdown("The following parameters will be extracted:")
+            for param in params:
+                st.markdown(f"- {param}")
         
         with tab3:
             st.markdown("#### ⚙️ Gearbox")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Type
-                - Number of Teeth
-                - Module
-                - Material
-                - Pressure Angle (deg)
-                - Face Width/Length (mm)
-                - Hand
-                - Mounting
-                - Helix Angle (deg)
-                - Drawing Number
-            """)
+            params = get_parameters_for_type("GEARBOX")
+            st.markdown("The following parameters will be extracted:")
+            for param in params:
+                st.markdown(f"- {param}")
         
         with tab4:
             st.markdown("#### 🔩 Hex Nut")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Type
-                - Size
-                - Property Class
-                - Thread Pitch
-                - Coating
-                - Nut Standard
-                - Drawing Number
-            """)
+            params = get_parameters_for_type("NUT")
+            st.markdown("The following parameters will be extracted:")
+            for param in params:
+                st.markdown(f"- {param}")
         
         with tab5:
             st.markdown("#### 🏗️ Lifting Ram")
-            st.markdown("""
-                The following parameters will be extracted:
-                - Height (mm)
-                - Total Stroke (mm)
-                - Piston Stroke (mm)
-                - Piston Lifting Force (kN)
-                - Weight (kg)
-                - Oil Volume (l)
-                - Drawing Number
-            """)
+            params = get_parameters_for_type("LIFTING_RAM")
+            st.markdown("The following parameters will be extracted:")
+            for param in params:
+                st.markdown(f"- {param}")
 
         st.divider()
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("#### 🔄 Custom Product Types")
-            st.markdown("""
-                You can add custom product types with their own parameters using the sidebar menu.
-                All measurements are automatically converted to the specified units.
-            """)
+            if st.session_state.custom_products:
+                st.markdown("Currently defined custom products:")
+                for product_name in st.session_state.custom_products:
+                    with st.expander(f"📋 {product_name}"):
+                        params = get_parameters_for_type(product_name)
+                        for param in params:
+                            st.markdown(f"- {param}")
+            else:
+                st.markdown("No custom product types defined yet.")
+                
         with col2:
-            st.info("💡 To add a custom product type:\n1. Open the sidebar\n2. Enter product name\n3. Add required parameters\n4. Save the new product type")
+            st.info("""
+                💡 To add a custom product type:
+                1. Open the sidebar menu
+                2. Enter product name
+                3. Add required parameters with units
+                4. Save the new product type
+            """)
 
     # Add New Product Section
     with st.sidebar:
